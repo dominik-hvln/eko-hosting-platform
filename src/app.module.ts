@@ -6,6 +6,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UsersModule } from './users/users.module';
 import { User } from './users/entities/user.entity'; // <-- 1. IMPORTUJEMY ENCJE
 import { AuthModule } from './auth/auth.module';
+import { PlansModule } from './plans/plans.module';
+import { Plan } from './plans/entities/plan.entity';
 
 @Module({
   imports: [
@@ -23,14 +25,14 @@ import { AuthModule } from './auth/auth.module';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        // 2. DODAJEMY ENCJE DO TABLICY
-        entities: [User],
+        entities: [User, Plan],
         synchronize: true,
       }),
     }),
     // Moduł użytkowników został tu dodany automatycznie przez `nest g resource`
     UsersModule,
     AuthModule,
+    PlansModule,
   ],
   controllers: [AppController],
   providers: [AppService],
