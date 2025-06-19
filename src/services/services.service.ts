@@ -1,26 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { CreateServiceDto } from './dto/create-service.dto';
-import { UpdateServiceDto } from './dto/update-service.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Service } from './entities/service.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class ServicesService {
-  create(createServiceDto: CreateServiceDto) {
-    return 'This action adds a new service';
-  }
+  constructor(
+      @InjectRepository(Service)
+      private readonly servicesRepository: Repository<Service>,
+  ) {}
 
-  findAll() {
-    return `This action returns all services`;
-  }
+  async create(createServiceDto: CreateServiceDto): Promise<Service> {
+    const { name, userId, planId } = createServiceDto;
 
-  findOne(id: number) {
-    return `This action returns a #${id} service`;
-  }
+    // Zwróć uwagę, jak przypisujemy relacje – TypeORM jest na tyle sprytny,
+    // że wystarczy mu podać obiekty z samym `id`, aby poprawnie
+    // utworzył klucze obce w bazie danych.
+    const newService = this.servicesRepository.create({
+      name,
+      user: { id: userId },
+      plan: { id: planId },
+    });
 
-  update(id: number, updateServiceDto: UpdateServiceDto) {
-    return `This action updates a #${id} service`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} service`;
+    return this.servicesRepository.save(newService);
   }
 }
