@@ -47,4 +47,13 @@ export class UsersService {
   async findOneByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOneBy({ email });
   }
+
+  async findAll(): Promise<Omit<User, 'password'>[]> {
+    const users = await this.usersRepository.find();
+    // Używamy map, aby przejść po każdym użytkowniku i zwrócić jego "bezpieczną" wersję
+    return users.map((user) => {
+      const { password, ...result } = user; // Usuwamy hasło z wyniku
+      return result;
+    });
+  }
 }
