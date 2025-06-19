@@ -43,4 +43,8 @@ export class UsersService {
     const { password: _, ...result } = newUser;
     return result;
   }
+
+  async findOneByEmail(email: string): Promise<User | null> {
+    return this.usersRepository.findOneBy({ email });
+  }
 }
