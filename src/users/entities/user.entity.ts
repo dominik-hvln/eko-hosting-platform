@@ -6,6 +6,8 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import { OneToMany } from 'typeorm';
+import { Service } from '../../services/entities/service.entity';
 
 @Entity({ name: 'users' }) // Mówi TypeORM, że ta klasa to encja mapowana na tabelę 'users'
 export class User {
@@ -33,4 +35,7 @@ export class User {
 
     @UpdateDateColumn() // Automatycznie ustawiana data ostatniej aktualizacji
     updatedAt: Date;
+
+    @OneToMany(() => Service, (service) => service.user)
+    services: Service[];
 }

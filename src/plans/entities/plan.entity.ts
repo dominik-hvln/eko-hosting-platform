@@ -5,6 +5,8 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import { OneToMany } from 'typeorm';
+import { Service } from '../../services/entities/service.entity';
 
 @Entity({ name: 'plans' })
 export class Plan {
@@ -43,4 +45,7 @@ export class Plan {
 
     @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
+
+    @OneToMany(() => Service, (service) => service.plan)
+    services: Service[];
 }
