@@ -1,26 +1,28 @@
-import { Injectable } from '@nestjs/common';
-import { CreateWalletDto } from './dto/create-wallet.dto';
-import { UpdateWalletDto } from './dto/update-wallet.dto';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Wallet } from './entities/wallet.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class WalletService {
-  create(createWalletDto: CreateWalletDto) {
-    return 'This action adds a new wallet';
-  }
+  constructor(
+      @InjectRepository(Wallet)
+      private readonly walletsRepository: Repository<Wallet>,
+  ) {}
 
-  findAll() {
-    return `This action returns all wallet`;
-  }
+  // Ta metoda będzie znajdować portfel po ID użytkownika
+  async findOneByUserId(userId: string): Promise<Wallet> {
+    const wallet = await this.walletsRepository.findOne({
+      where: {
+        user: {
+          id: userId,
+        },
+      },
+    });
 
-  findOne(id: number) {
-    return `This action returns a #${id} wallet`;
-  }
-
-  update(id: number, updateWalletDto: UpdateWalletDto) {
-    return `This action updates a #${id} wallet`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} wallet`;
+    if (!wallet) {
+      throw new NotFoundException(`Wallet for user with ID "${userId}" not found`);
+    }
+    return wallet;
   }
 }
