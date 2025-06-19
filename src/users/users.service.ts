@@ -8,19 +8,21 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { Wallet } from '../wallet/entities/wallet.entity';
 
 @Injectable()
 export class UsersService {
   constructor(
       @InjectRepository(User)
       private usersRepository: Repository<User>,
+      @InjectRepository(Wallet)
+      private walletsRepository: Repository<Wallet>,
   ) {}
 
   // ZMIENIAMY TYP ZWRACANY TUTAJ
   async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
     const { email, password } = createUserDto;
 
-    // ... reszta kodu metody pozostaje bez zmian ...
     const existingUser = await this.usersRepository.findOneBy({ email });
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
@@ -39,6 +41,9 @@ export class UsersService {
     } catch (error) {
       throw new InternalServerErrorException();
     }
+
+    const newWallet = this.walletsRepository.create({ user: newUser });
+    await this.walletsRepository.save(newWallet);
 
     const { password: _, ...result } = newUser;
     return result;

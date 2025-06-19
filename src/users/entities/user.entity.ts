@@ -8,6 +8,8 @@ import {
 } from 'typeorm';
 import { OneToMany } from 'typeorm';
 import { Service } from '../../services/entities/service.entity';
+import { OneToOne } from 'typeorm';
+import { Wallet } from '../../wallet/entities/wallet.entity';
 
 @Entity({ name: 'users' }) // Mówi TypeORM, że ta klasa to encja mapowana na tabelę 'users'
 export class User {
@@ -38,4 +40,8 @@ export class User {
 
     @OneToMany(() => Service, (service) => service.user)
     services: Service[];
+
+    // Jeden użytkownik ma jeden portfel
+    @OneToOne(() => Wallet, (wallet) => wallet.user)
+    wallet: Wallet;
 }
