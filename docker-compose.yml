@@ -1,4 +1,5 @@
 services:
+  # Nasz serwis API
   api:
     build: .
     command: npm run start:dev
@@ -8,3 +9,27 @@ services:
       - ./src:/usr/src/app/src
     env_file:
       - .env
+    # Ta linia gwarantuje, że serwis bazy danych uruchomi się PRZED naszą aplikacją
+    depends_on:
+      - db
+
+  # Nowy serwis bazy danych PostgreSQL
+  db:
+    # Używamy oficjalnego obrazu postgres w lekkiej wersji alpine
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      # Ustawiamy dane dostępowe do bazy danych
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: hosting_db
+    ports:
+      # Mapujemy port bazy danych, aby móc się do niej podłączyć z zewnątrz
+      - "5432:5432"
+    volumes:
+      # Ta linia gwarantuje, że dane w bazie przetrwają restart kontenera
+      - postgres_data:/var/lib/postgresql/data
+
+# Definiujemy nazwany wolumen, aby Docker nim zarządzał
+volumes:
+  postgres_data:
