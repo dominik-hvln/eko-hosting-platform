@@ -10,6 +10,7 @@ import { ServicesModule } from './services/services.module';
 import { WalletModule } from './wallet/wallet.module';
 import { EkoModule } from './eko/eko.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     WalletModule,
     EkoModule,
     DashboardModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
