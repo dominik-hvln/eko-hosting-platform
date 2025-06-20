@@ -60,4 +60,19 @@ export class PaymentsController {
 
     return this.paymentsService.handleStripeWebhook(signature, rawBody);
   }
+
+  @Post('webhook/payu')
+  async handlePayuWebhook(
+      @Headers('openpayu-signature') signature: string, // PayU używa innego nagłówka
+      @Req() req: Request,
+  ) {
+    if (!signature) {
+      throw new BadRequestException('Missing openpayu-signature header');
+    }
+    const rawBody = (req as any).rawBody;
+    if (!rawBody) {
+      throw new BadRequestException('Webhook request is missing a raw body');
+    }
+    return this.paymentsService.handlePayuWebhook(signature, rawBody);
+  }
 }

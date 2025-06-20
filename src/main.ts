@@ -5,18 +5,19 @@ import { json } from 'express'; // Ważne: importujemy 'json' bezpośrednio z ex
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    // Wyłączamy domyślny parser NestJS, aby za chwilę dodać własny z express
     bodyParser: false,
   });
 
-  // Dodajemy globalny parser JSON z limitem i kluczową opcją 'verify'
   app.use(
       json({
-        // Funkcja 'verify' jest sercem rozwiązania.
-        // Uruchamia się dla każdego żądania i zapisuje jego surową treść
-        // w nowej właściwości `rawBody`, zanim przekaże je dalej.
         verify: (req: any, res, buf) => {
-          req.rawBody = buf;
+            if (
+                req.url.startsWith('/payments/webhook/stripe') ||
+                req.url.startsWith('/payments/webhook/payu')
+            ) {
+                // Jeśli tak, dołączamy surowe body
+                req.rawBody = buf;
+            }
         },
       }),
   );

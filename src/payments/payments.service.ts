@@ -11,6 +11,7 @@ import { TransactionStatus } from '../common/enums/transaction-status.enum';
 import { TransactionType } from '../common/enums/transaction-type.enum';
 import { PayUService } from './providers/payu.service';
 import { User } from '../users/entities/user.entity';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class PaymentsService {
@@ -113,6 +114,72 @@ export class PaymentsService {
         await manager.save(newTransaction);
       });
     }
+    return { received: true };
+  }
+
+  async handlePayuWebhook(signatureHeader: string, rawBody: Buffer) {
+    // 1. Weryfikacja podpisu - krok bezpieczeństwa
+    const secondKey = this.configService.get<string>('PAYU_SECOND_KEY')!;
+    const bodyString = rawBody.toString();
+    const expectedSignature = crypto
+        .createHash('md5')
+        .update(bodyString + secondKey)
+        .digest('hex');
+
+    // Wyciągamy właściwy podpis z nagłówka
+    const signature = signatureHeader.split(';').reduce((acc, part) => {
+      const [key, value] = part.split('=');
+      acc[key.trim()] = value;
+      return acc;
+    }, {})['signature'];
+
+    if (signature !== expectedSignature) {
+      throw new BadRequestException('Invalid PayU signature');
+    }
+
+    // 2. Obsługa zdarzenia
+    const notification = JSON.parse(bodyString);
+
+    if (notification.order.status === 'COMPLETED') {
+      const orderId = notification.order.orderId;
+      const customerEmail = notification.order.buyer.email;
+      const amountTotal = notification.order.totalAmount; // kwota w groszach
+
+      await this.dataSource.transaction(async (manager) => {
+        const wallet = await manager.findOne(Wallet, {
+          where: { user: { email: customerEmail } },
+        });
+
+        if (!wallet) {
+          console.error('Wallet not found for email:', customerEmail);
+          return;
+        }
+
+        const existingTransaction = await manager.findOne(Transaction, {
+          where: { providerTransactionId: orderId },
+        });
+        if (existingTransaction) {
+          console.log('Transaction already processed:', orderId);
+          return;
+        }
+
+        const amountToAdd = parseInt(amountTotal) / 100;
+        wallet.balance = parseFloat(wallet.balance.toString()) + amountToAdd;
+        await manager.save(wallet);
+
+        const newTransaction = manager.create(Transaction, {
+          wallet: wallet,
+          amount: amountToAdd,
+          currency: 'pln',
+          status: TransactionStatus.COMPLETED,
+          type: TransactionType.TOP_UP,
+          provider: 'payu',
+          providerTransactionId: orderId,
+        });
+        await manager.save(newTransaction);
+      });
+    }
+    // PayU oczekuje odpowiedzi 200 OK, aby wiedzieć, że powiadomienie dotarło
     return { received: true };
   }
 }
