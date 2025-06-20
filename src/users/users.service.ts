@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -9,6 +10,7 @@ import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Wallet } from '../wallet/entities/wallet.entity';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -19,46 +21,69 @@ export class UsersService {
       private walletsRepository: Repository<Wallet>,
   ) {}
 
-  // ZMIENIAMY TYP ZWRACANY TUTAJ
-  async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
+  async create(
+      createUserDto: CreateUserDto,
+  ): Promise<Omit<User, 'password'>> {
+    // ... istniejąca metoda create bez zmian ...
     const { email, password } = createUserDto;
-
     const existingUser = await this.usersRepository.findOneBy({ email });
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
     }
-
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(password, salt);
-
     const newUser = this.usersRepository.create({
       email,
       password: hashedPassword,
     });
-
-    try {
-      await this.usersRepository.save(newUser);
-    } catch (error) {
-      throw new InternalServerErrorException();
-    }
-
+    await this.usersRepository.save(newUser);
     const newWallet = this.walletsRepository.create({ user: newUser });
     await this.walletsRepository.save(newWallet);
-
     const { password: _, ...result } = newUser;
     return result;
+  }
+
+  async findAll(): Promise<Omit<User, 'password'>[]> {
+    const users = await this.usersRepository.find();
+    return users.map((user) => {
+      const { password, ...result } = user;
+      return result;
+    });
   }
 
   async findOneByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOneBy({ email });
   }
 
-  async findAll(): Promise<Omit<User, 'password'>[]> {
-    const users = await this.usersRepository.find();
-    // Używamy map, aby przejść po każdym użytkowniku i zwrócić jego "bezpieczną" wersję
-    return users.map((user) => {
-      const { password, ...result } = user; // Usuwamy hasło z wyniku
-      return result;
+  // --- NOWE METODY ADMINISTRACYJNE ---
+
+  async findOne(id: string): Promise<Omit<User, 'password'>> {
+    const user = await this.usersRepository.findOneBy({ id });
+    if (!user) {
+      throw new NotFoundException(`User with ID "${id}" not found`);
+    }
+    const { password, ...result } = user;
+    return result;
+  }
+
+  async update(
+      id: string,
+      updateUserDto: UpdateUserDto,
+  ): Promise<Omit<User, 'password'>> {
+    const user = await this.usersRepository.preload({
+      id: id,
+      ...updateUserDto,
     });
+    if (!user) {
+      throw new NotFoundException(`User with ID "${id}" not found`);
+    }
+    const updatedUser = await this.usersRepository.save(user);
+    const { password, ...result } = updatedUser;
+    return result;
+  }
+
+  async remove(id: string): Promise<void> {
+    const user = await this.findOne(id); // Używamy findOne, aby rzucić błąd, jeśli nie znajdzie
+    await this.usersRepository.delete(id);
   }
 }

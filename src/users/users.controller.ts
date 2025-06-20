@@ -1,34 +1,67 @@
-import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  Param,
+  Patch,
+  Delete,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from '../auth/guards/roles.guard'; // <-- 1. IMPORTUJEMY RolesGuard
-import { Roles } from '../auth/decorators/roles.decorator'; // <-- 2. IMPORTUJEMY Roles
-import { Role } from '../common/enums/role.enum'; // <-- 3. IMPORTUJEMY Role
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // Rejestracja - publiczna, bez guardów
+  // --- ENDPOINT PUBLICZNY ---
   @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  create(@Body() createDto: CreateUserDto) {
+    return this.usersService.create(createDto);
   }
 
-  // Profil zalogowanego użytkownika - dla każdego zalogowanego
+  // --- ENDPOINT DLA ZALOGOWANYCH ---
   @UseGuards(AuthGuard('jwt'))
   @Get('profile')
   getProfile(@Request() req) {
-    return req.user;
+    // Zwraca profil zalogowanego użytkownika (zwróci tylko ID i email)
+    return this.usersService.findOne(req.user.userId);
   }
 
-  // --- ZMODYFIKOWANA METODA ---
-  // Lista wszystkich użytkowników - tylko dla admina
+  // --- ENDPOINTY TYLKO DLA ADMINA ---
+
   @Get()
-  @Roles(Role.ADMIN) // <-- 4. OZNACZAMY WYMAGANĄ ROLĘ
-  @UseGuards(AuthGuard('jwt'), RolesGuard) // <-- 5. UŻYWAMY OBU STRAŻNIKÓW
+  @Roles(Role.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   findAll() {
     return this.usersService.findAll();
+  }
+
+  @Get(':id')
+  @Roles(Role.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  findOne(@Param('id') id: string) {
+    return this.usersService.findOne(id);
+  }
+
+  @Patch(':id')
+  @Roles(Role.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    return this.usersService.update(id, updateUserDto);
+  }
+
+  @Delete(':id')
+  @Roles(Role.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  remove(@Param('id') id: string) {
+    return this.usersService.remove(id);
   }
 }
