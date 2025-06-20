@@ -9,6 +9,7 @@ import { PlansModule } from './plans/plans.module';
 import { ServicesModule } from './services/services.module';
 import { WalletModule } from './wallet/wallet.module';
 import { EkoModule } from './eko/eko.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { EkoModule } from './eko/eko.module';
     ServicesModule,
     WalletModule,
     EkoModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
