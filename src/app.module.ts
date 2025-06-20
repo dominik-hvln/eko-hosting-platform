@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { PlansModule } from './plans/plans.module';
 import { ServicesModule } from './services/services.module';
 import { WalletModule } from './wallet/wallet.module';
+import { EkoModule } from './eko/eko.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { WalletModule } from './wallet/wallet.module';
     PlansModule,
     ServicesModule,
     WalletModule,
+    EkoModule,
   ],
   controllers: [AppController],
   providers: [AppService],

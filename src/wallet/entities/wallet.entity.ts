@@ -14,14 +14,12 @@ export class Wallet {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    // Saldo portfela, z dużą precyzją, domyślnie 0.00
     @Column({ type: 'decimal', precision: 12, scale: 2, default: 0.0 })
     balance: number;
 
-    // --- RELACJA JEDEN-DO-JEDNEGO Z UŻYTKOWNIKIEM ---
-    // @JoinColumn jest kluczowy! Oznacza, że w tej tabeli ('wallets')
-    // znajdzie się klucz obcy (kolumna 'userId').
-    // Stawiamy go zawsze po "właścicielskiej" stronie relacji.
+    @Column({ name: 'eko_points', type: 'integer', default: 0 })
+    ekoPoints: number;
+
     @OneToOne(() => User, (user) => user.wallet, { onDelete: 'CASCADE' })
     @JoinColumn()
     user: User;
