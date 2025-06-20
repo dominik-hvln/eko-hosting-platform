@@ -14,16 +14,32 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { Request as ExpressRequest } from 'express'; // Używamy standardowego typu Request
 
 @Controller('payments')
+@UseGuards(AuthGuard('jwt'))
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post('top-up/stripe')
-  @UseGuards(AuthGuard('jwt'))
   createStripeTopUpSession(
       @Body() createPaymentDto: CreatePaymentDto,
       @Request() req,
   ) {
-    return this.paymentsService.createTopUpSession(createPaymentDto, req.user);
+    return this.paymentsService.createTopUpSession(
+        createPaymentDto,
+        req.user,
+        'stripe', // Przekazujemy nazwę providera
+    );
+  }
+
+  @Post('top-up/payu')
+  createPayuTopUpSession(
+      @Body() createPaymentDto: CreatePaymentDto,
+      @Request() req,
+  ) {
+    return this.paymentsService.createTopUpSession(
+        createPaymentDto,
+        req.user,
+        'payu', // Przekazujemy nazwę providera
+    );
   }
 
   @Post('webhook/stripe')

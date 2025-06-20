@@ -9,13 +9,14 @@ import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { TransactionStatus } from '../common/enums/transaction-status.enum';
 import { TransactionType } from '../common/enums/transaction-type.enum';
+import { PayUService } from './providers/payu.service';
 import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class PaymentsService {
-  // --- POPRAWNY KONSTRUKTOR Z WSZYSTKIMI ZALEŻNOŚCIAMI ---
   constructor(
       private readonly stripeService: StripeService,
+      private readonly payuService: PayUService,
       private readonly configService: ConfigService,
       @InjectRepository(Wallet)
       private readonly walletsRepository: Repository<Wallet>,
@@ -27,14 +28,25 @@ export class PaymentsService {
   async createTopUpSession(
       createPaymentDto: CreatePaymentDto,
       user: Omit<User, 'password'>,
+      provider: 'stripe' | 'payu',
   ) {
-    return this.stripeService.createPaymentSession({
+    const args = {
       amount: createPaymentDto.amount * 100,
       currency: 'pln',
       userEmail: user.email,
       successUrl: 'http://localhost:3001/payment/success',
       cancelUrl: 'http://localhost:3001/payment/cancel',
-    });
+    };
+
+    // Używamy switcha, aby wybrać odpowiedni adapter
+    switch (provider) {
+      case 'stripe':
+        return this.stripeService.createPaymentSession(args);
+      case 'payu':
+        return this.payuService.createPaymentSession(args);
+      default:
+        throw new BadRequestException('Invalid payment provider');
+    }
   }
 
   async handleStripeWebhook(signature: string, rawBody: Buffer) {
@@ -52,8 +64,6 @@ export class PaymentsService {
           this.configService.get<string>('STRIPE_WEBHOOK_SECRET')!,
       );
     } catch (err) {
-      console.error('!!! STRIPE WEBHOOK SIGNATURE VERIFICATION FAILED !!!');
-      console.error(err);
       throw new BadRequestException(`Webhook Error: ${err.message}`);
     }
 
