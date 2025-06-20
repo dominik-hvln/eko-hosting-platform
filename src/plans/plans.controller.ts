@@ -1,11 +1,24 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { PlansService } from './plans.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../auth/guards/roles.guard'; // <-- 1. IMPORTUJEMY RolesGuard
+import { Roles } from '../auth/decorators/roles.decorator'; // <-- 2. IMPORTUJEMY Roles
+import { Role } from '../common/enums/role.enum'; // <-- 3. IMPORTUJEMY Role
 
 @Controller('plans')
-@UseGuards(AuthGuard('jwt'))
+@Roles(Role.ADMIN) // <-- 4. OZNACZAMY, ŻE CAŁY KONTROLER JEST DLA ADMINA
+@UseGuards(AuthGuard('jwt'), RolesGuard) // <-- 5. DODAJEMY RolesGuard
 export class PlansController {
   constructor(private readonly plansService: PlansService) {}
 
