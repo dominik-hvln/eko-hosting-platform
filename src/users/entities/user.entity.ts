@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import { Role } from '../../common/enums/role.enum';
 import {
     Entity,
@@ -19,6 +20,7 @@ export class User {
     @Column({ unique: true }) // Kolumna z adresem email, musi być unikalny
     email: string;
 
+    @Exclude()
     @Column() // Kolumna z hasłem (będziemy je hashować przed zapisem)
     password: string;
 

@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Service } from './entities/service.entity';
 import { Repository } from 'typeorm';
+import { UpdateServiceDto } from './dto/update-service.dto';
 
 @Injectable()
 export class ServicesService {
@@ -21,20 +22,52 @@ export class ServicesService {
     return this.servicesRepository.save(newService);
   }
 
-  // --- NOWA METODA ---
-  // Znajduje wszystkie usługi dla danego użytkownika
   async findAllForUser(userId: string): Promise<Service[]> {
-    // Używamy metody find z warunkiem 'where', aby filtrować wyniki.
-    // Szukamy usług, gdzie relacja 'user' ma podane 'id'.
-    // Dodatkowo 'relations: ['plan']' sprawia, że TypeORM dołączy
-    // pełne dane planu do każdej usługi, a nie tylko jego ID.
     return this.servicesRepository.find({
-      where: {
-        user: {
-          id: userId,
-        },
-      },
+      where: { user: { id: userId } },
       relations: ['plan'],
     });
+  }
+
+  // --- NOWE METODY ADMINISTRACYJNE ---
+
+  // Znajduje wszystkie usługi w systemie (dla admina)
+  async findAll(): Promise<Service[]> {
+    return this.servicesRepository.find({
+      relations: ['user', 'plan'], // Dołączamy dane usera i planu
+    });
+  }
+
+  // Znajduje jedną, konkretną usługę
+  async findOne(id: string): Promise<Service> {
+    const service = await this.servicesRepository.findOne({
+      where: { id },
+      relations: ['user', 'plan'],
+    });
+    if (!service) {
+      throw new NotFoundException(`Service with ID "${id}" not found`);
+    }
+    return service;
+  }
+
+  // Aktualizuje usługę
+  async update(
+      id: string,
+      updateServiceDto: UpdateServiceDto,
+  ): Promise<Service> {
+    const service = await this.servicesRepository.preload({
+      id: id,
+      ...updateServiceDto,
+    });
+    if (!service) {
+      throw new NotFoundException(`Service with ID "${id}" not found`);
+    }
+    return this.servicesRepository.save(service);
+  }
+
+  // Usuwa usługę
+  async remove(id: string): Promise<void> {
+    const service = await this.findOne(id);
+    await this.servicesRepository.remove(service);
   }
 }

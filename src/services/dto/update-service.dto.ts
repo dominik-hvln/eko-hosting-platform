@@ -1,4 +1,12 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateServiceDto } from './create-service.dto';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { ServiceStatus } from '../../common/enums/service-status.enum';
 
-export class UpdateServiceDto extends PartialType(CreateServiceDto) {}
+export class UpdateServiceDto {
+    @IsString()
+    @IsOptional()
+    name?: string;
+
+    @IsEnum(ServiceStatus)
+    @IsOptional()
+    status?: ServiceStatus;
+}
