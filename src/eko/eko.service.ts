@@ -28,4 +28,18 @@ export class EkoService {
     wallet.ekoPoints += POINTS_FOR_DARK_MODE;
     return this.walletsRepository.save(wallet);
   }
+  async getSummaryForUser(userId: string): Promise<{ ekoPoints: number }> {
+    const wallet = await this.walletsRepository.findOneBy({
+      user: { id: userId },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException(
+          `Wallet for user with ID "${userId}" not found`,
+      );
+    }
+
+    // Zwracamy tylko interesujące nas dane, a nie cały obiekt portfela
+    return { ekoPoints: wallet.ekoPoints };
+  }
 }

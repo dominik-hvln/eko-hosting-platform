@@ -1,4 +1,4 @@
-import { Controller, Post, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, UseGuards, Request, Get } from '@nestjs/common';
 import { EkoService } from './eko.service';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -12,5 +12,11 @@ export class EkoController {
   addPointsForDarkMode(@Request() req) {
     const userId = req.user.userId;
     return this.ekoService.addPointsForDarkMode(userId);
+  }
+
+  @Get('summary')
+  getSummary(@Request() req) {
+    const userId = req.user.userId;
+    return this.ekoService.getSummaryForUser(userId);
   }
 }
