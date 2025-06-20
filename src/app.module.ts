@@ -11,6 +11,7 @@ import { WalletModule } from './wallet/wallet.module';
 import { EkoModule } from './eko/eko.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PaymentsModule } from './payments/payments.module';
+import { TransactionsModule } from './transactions/transactions.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { PaymentsModule } from './payments/payments.module';
     EkoModule,
     DashboardModule,
     PaymentsModule,
+    TransactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

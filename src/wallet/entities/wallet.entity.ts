@@ -8,6 +8,8 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import { OneToMany } from 'typeorm';
+import { Transaction } from '../../transactions/entities/transaction.entity';
 
 @Entity({ name: 'wallets' })
 export class Wallet {
@@ -23,6 +25,9 @@ export class Wallet {
     @OneToOne(() => User, (user) => user.wallet, { onDelete: 'CASCADE' })
     @JoinColumn()
     user: User;
+
+    @OneToMany(() => Transaction, (transaction) => transaction.wallet)
+    transactions: Transaction[];
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
