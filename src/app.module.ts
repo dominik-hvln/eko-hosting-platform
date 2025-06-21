@@ -17,6 +17,7 @@ import { RenewalsModule } from './renewals/renewals.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { TicketMessagesModule } from './ticket-messages/ticket-messages.module';
 import { EncryptionModule } from './common/encryption/encryption.module';
+import { MigrationsModule } from './migrations/migrations.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { EncryptionModule } from './common/encryption/encryption.module';
     TicketsModule,
     TicketMessagesModule,
     EncryptionModule,
+    MigrationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

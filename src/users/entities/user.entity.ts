@@ -13,6 +13,7 @@ import { OneToOne } from 'typeorm';
 import { Wallet } from '../../wallet/entities/wallet.entity';
 import { Ticket } from '../../tickets/entities/ticket.entity';
 import { TicketMessage } from '../../ticket-messages/entities/ticket-message.entity';
+import { MigrationRequest } from '../../migrations/entities/migration.entity';
 
 @Entity({ name: 'users' }) // Mówi TypeORM, że ta klasa to encja mapowana na tabelę 'users'
 export class User {
@@ -60,4 +61,7 @@ export class User {
     // Wiadomości napisane przez tego użytkownika
     @OneToMany(() => TicketMessage, (message) => message.author)
     ticketMessages: TicketMessage[];
+
+    @OneToMany(() => MigrationRequest, (request) => request.user)
+    migrationRequests: MigrationRequest[];
 }
