@@ -4,6 +4,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Ticket } from './entities/ticket.entity';
 import { DataSource, Repository } from 'typeorm';
 import { TicketMessage } from '../ticket-messages/entities/ticket-message.entity';
+import { CreateTicketMessageDto } from '../ticket-messages/dto/create-ticket-message.dto';
+import { TicketStatus } from '../common/enums/ticket-status.enum';
 
 @Injectable()
 export class TicketsService {
@@ -72,5 +74,29 @@ export class TicketsService {
       throw new NotFoundException(`Ticket with ID "${id}" not found`);
     }
     return ticket;
+  }
+
+  async addMessage(
+      ticketId: string,
+      authorId: string,
+      createMessageDto: CreateTicketMessageDto,
+  ): Promise<TicketMessage> {
+    // 1. Najpierw sprawdzamy, czy użytkownik ma dostęp do tego ticketa
+    const ticket = await this.findOneForUser(ticketId, authorId);
+
+    // 2. Tworzymy nową wiadomość
+    const newMessage = this.ticketMessagesRepository.create({
+      content: createMessageDto.content,
+      ticket: ticket,
+      author: { id: authorId },
+    });
+
+    // 3. Zmieniamy status ticketa, jeśli odpowiada klient
+    // (w przyszłości dodamy logikę dla pracownika)
+    ticket.status = TicketStatus.IN_PROGRESS;
+    await this.ticketsRepository.save(ticket);
+
+    // 4. Zapisujemy nową wiadomość
+    return this.ticketMessagesRepository.save(newMessage);
   }
 }
