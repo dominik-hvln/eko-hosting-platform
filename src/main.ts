@@ -8,6 +8,12 @@ async function bootstrap() {
     bodyParser: false,
   });
 
+    app.enableCors({
+        origin: 'http://localhost:3000', // Pozwalamy na żądania z tego konkretnego adresu
+        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Jakie metody są dozwolone
+        credentials: true,
+    });
+
   app.use(
       json({
         verify: (req: any, res, buf) => {
@@ -26,6 +32,6 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe());
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
-  await app.listen(3000);
+  await app.listen(4000);
 }
 bootstrap();
