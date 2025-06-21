@@ -25,15 +25,17 @@ export class Service {
     })
     status: ServiceStatus;
 
-    // --- RELACJA Z UŻYTKOWNIKIEM ---
-    // Wiele usług może należeć do jednego użytkownika
     @ManyToOne(() => User, (user) => user.services)
     user: User;
 
-    // --- RELACJA Z PLANEM ---
-    // Wiele usług może być opartych na jednym planie
     @ManyToOne(() => Plan, (plan) => plan.services)
     plan: Plan;
+
+    @Column({ name: 'expires_at', type: 'timestamp with time zone', nullable: true })
+    expiresAt: Date | null;
+
+    @Column({ name: 'auto_renew', default: true })
+    autoRenew: boolean;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;

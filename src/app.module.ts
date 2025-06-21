@@ -12,6 +12,8 @@ import { EkoModule } from './eko/eko.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PaymentsModule } from './payments/payments.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { RenewalsModule } from './renewals/renewals.module';
 
 @Module({
   imports: [
@@ -34,6 +36,7 @@ import { TransactionsModule } from './transactions/transactions.module';
         synchronize: true,
       }),
     }),
+    ScheduleModule.forRoot(),
     UsersModule,
     AuthModule,
     PlansModule,
@@ -43,6 +46,7 @@ import { TransactionsModule } from './transactions/transactions.module';
     DashboardModule,
     PaymentsModule,
     TransactionsModule,
+    RenewalsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
