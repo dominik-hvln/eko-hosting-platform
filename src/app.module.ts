@@ -14,6 +14,8 @@ import { PaymentsModule } from './payments/payments.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { RenewalsModule } from './renewals/renewals.module';
+import { TicketsModule } from './tickets/tickets.module';
+import { TicketMessagesModule } from './ticket-messages/ticket-messages.module';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { RenewalsModule } from './renewals/renewals.module';
     PaymentsModule,
     TransactionsModule,
     RenewalsModule,
+    TicketsModule,
+    TicketMessagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -11,6 +11,8 @@ import { OneToMany } from 'typeorm';
 import { Service } from '../../services/entities/service.entity';
 import { OneToOne } from 'typeorm';
 import { Wallet } from '../../wallet/entities/wallet.entity';
+import { Ticket } from '../../tickets/entities/ticket.entity';
+import { TicketMessage } from '../../ticket-messages/entities/ticket-message.entity';
 
 @Entity({ name: 'users' }) // Mówi TypeORM, że ta klasa to encja mapowana na tabelę 'users'
 export class User {
@@ -46,4 +48,16 @@ export class User {
     // Jeden użytkownik ma jeden portfel
     @OneToOne(() => Wallet, (wallet) => wallet.user)
     wallet: Wallet;
+
+    // Zgłoszenia stworzone przez tego użytkownika
+    @OneToMany(() => Ticket, (ticket) => ticket.author)
+    createdTickets: Ticket[];
+
+    // Zgłoszenia przypisane do tego użytkownika (jeśli jest pracownikiem)
+    @OneToMany(() => Ticket, (ticket) => ticket.assignee)
+    assignedTickets: Ticket[];
+
+    // Wiadomości napisane przez tego użytkownika
+    @OneToMany(() => TicketMessage, (message) => message.author)
+    ticketMessages: TicketMessage[];
 }
