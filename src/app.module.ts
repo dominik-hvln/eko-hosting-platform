@@ -16,6 +16,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { RenewalsModule } from './renewals/renewals.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { TicketMessagesModule } from './ticket-messages/ticket-messages.module';
+import { EncryptionModule } from './common/encryption/encryption.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { TicketMessagesModule } from './ticket-messages/ticket-messages.module';
     RenewalsModule,
     TicketsModule,
     TicketMessagesModule,
+    EncryptionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
