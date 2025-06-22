@@ -35,8 +35,8 @@ export class PaymentsService {
       amount: createPaymentDto.amount * 100,
       currency: 'pln',
       userEmail: user.email,
-      successUrl: 'http://localhost:3001/payment/success',
-      cancelUrl: 'http://localhost:3001/payment/cancel',
+      successUrl: 'http://localhost:3000/payment/success',
+      cancelUrl: 'http://localhost:3000/payment/cancel',
     };
 
     // Używamy switcha, aby wybrać odpowiedni adapter

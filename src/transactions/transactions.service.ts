@@ -1,26 +1,30 @@
 import { Injectable } from '@nestjs/common';
-import { CreateTransactionDto } from './dto/create-transaction.dto';
-import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Transaction } from './entities/transaction.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class TransactionsService {
-  create(createTransactionDto: CreateTransactionDto) {
-    return 'This action adds a new transaction';
-  }
+  constructor(
+      @InjectRepository(Transaction)
+      private readonly transactionsRepository: Repository<Transaction>,
+  ) {}
 
-  findAll() {
-    return `This action returns all transactions`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} transaction`;
-  }
-
-  update(id: number, updateTransactionDto: UpdateTransactionDto) {
-    return `This action updates a #${id} transaction`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} transaction`;
+  // --- NOWA METODA ---
+  async findAllForUser(userId: string): Promise<Transaction[]> {
+    // Znajdujemy transakcje, gdzie portfel (wallet) należy do danego użytkownika (user)
+    return this.transactionsRepository.find({
+      where: {
+        wallet: {
+          user: {
+            id: userId,
+          },
+        },
+      },
+      // Sortujemy od najnowszych
+      order: {
+        createdAt: 'DESC',
+      },
+    });
   }
 }
