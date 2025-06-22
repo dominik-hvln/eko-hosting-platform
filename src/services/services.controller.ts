@@ -29,9 +29,20 @@ export class ServicesController {
     return this.servicesService.findAllForUser(userId);
   }
 
+  @Get('my-services/:id')
+  findOwnOne(@Param('id') id: string, @Request() req) {
+    const userId = req.user.userId;
+    return this.servicesService.findOneForUser(id, userId);
+  }
+
+  @Patch('my-services/:id/toggle-renew')
+  toggleAutoRenew(@Param('id') id: string, @Request() req) {
+    const userId = req.user.userId;
+    return this.servicesService.toggleAutoRenewForUser(id, userId);
+  }
+
   // --- ENDPOINTY TYLKO DLA ADMINA ---
 
-  // Tworzenie usługi - operacja administracyjna
   @Post()
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)

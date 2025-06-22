@@ -23,6 +23,7 @@ export class TicketsService {
       const newTicket = manager.create(Ticket, {
         subject: createTicketDto.subject,
         priority: createTicketDto.priority,
+        type: createTicketDto.type,
         author: { id: authorId },
       });
       await manager.save(newTicket);
@@ -43,7 +44,6 @@ export class TicketsService {
     });
   }
 
-  // --- NOWA METODA ---
   // Znajduje wszystkie zgłoszenia dla danego użytkownika
   async findAllForUser(authorId: string): Promise<Ticket[]> {
     return this.ticketsRepository.find({
@@ -98,5 +98,16 @@ export class TicketsService {
 
     // 4. Zapisujemy nową wiadomość
     return this.ticketMessagesRepository.save(newMessage);
+  }
+
+  async findAllForAdmin(): Promise<Ticket[]> {
+    return this.ticketsRepository.find({
+      relations: {
+        author: true, // Dołączamy dane autora (w tym email)
+      },
+      order: {
+        updatedAt: 'DESC', // Sortujemy od ostatnio aktualizowanych
+      },
+    });
   }
 }

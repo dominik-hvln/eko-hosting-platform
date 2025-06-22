@@ -29,8 +29,6 @@ export class ServicesService {
     });
   }
 
-  // --- NOWE METODY ADMINISTRACYJNE ---
-
   // Znajduje wszystkie usługi w systemie (dla admina)
   async findAll(): Promise<Service[]> {
     return this.servicesRepository.find({
@@ -69,5 +67,35 @@ export class ServicesService {
   async remove(id: string): Promise<void> {
     const service = await this.findOne(id);
     await this.servicesRepository.remove(service);
+  }
+
+  async findOneForUser(id: string, userId: string): Promise<Service> {
+    // Znajdujemy usługę, ale tylko jeśli jej ID oraz ID właściciela się zgadzają
+    const service = await this.servicesRepository.findOne({
+      where: {
+        id: id,
+        user: { id: userId }, // Kluczowy warunek bezpieczeństwa
+      },
+      relations: ['plan'], // Dołączamy pełne dane planu
+    });
+
+    if (!service) {
+      // Rzucamy błąd, jeśli usługa nie istnieje lub nie należy do tego użytkownika
+      throw new NotFoundException(
+          `Service with ID "${id}" not found or access denied`,
+      );
+    }
+    return service;
+  }
+
+  async toggleAutoRenewForUser(id: string, userId: string): Promise<Service> {
+    // Najpierw znajdujemy usługę, upewniając się, że należy do użytkownika
+    const service = await this.findOneForUser(id, userId);
+
+    // Zmieniamy wartość na przeciwną
+    service.autoRenew = !service.autoRenew;
+
+    // Zapisujemy i zwracamy zaktualizowaną usługę
+    return this.servicesRepository.save(service);
   }
 }

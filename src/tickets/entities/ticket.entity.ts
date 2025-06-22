@@ -11,6 +11,7 @@ import { TicketStatus } from '../../common/enums/ticket-status.enum';
 import { TicketPriority } from '../../common/enums/ticket-priority.enum';
 import { User } from '../../users/entities/user.entity';
 import { TicketMessage } from '../../ticket-messages/entities/ticket-message.entity';
+import { TicketType } from '../../common/enums/ticket-type.enum';
 
 @Entity({ name: 'tickets' })
 export class Ticket {
@@ -19,6 +20,9 @@ export class Ticket {
 
     @Column()
     subject: string;
+
+    @Column({ type: 'enum', enum: TicketType, default: TicketType.GENERAL })
+    type: TicketType;
 
     @Column({ type: 'enum', enum: TicketStatus, default: TicketStatus.OPEN })
     status: TicketStatus;

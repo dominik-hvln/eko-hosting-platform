@@ -1,16 +1,19 @@
 import {
   Controller,
-  Get, // <-- Dodajemy Get
+  Get,
   Post,
   Body,
   UseGuards,
   Request,
-  Param, // <-- Dodajemy Param
+  Param,
 } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateTicketMessageDto } from '../ticket-messages/dto/create-ticket-message.dto';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Controller('tickets')
 @UseGuards(AuthGuard('jwt'))
@@ -46,5 +49,12 @@ export class TicketsController {
   ) {
     const authorId = req.user.userId;
     return this.ticketsService.addMessage(id, authorId, createMessageDto);
+  }
+
+  @Get('admin/all')
+  @Roles(Role.ADMIN) // Tylko admin może wywołać tę metodę
+  @UseGuards(RolesGuard) // Używamy naszego strażnika ról
+  findAllForAdmin() {
+    return this.ticketsService.findAllForAdmin();
   }
 }
