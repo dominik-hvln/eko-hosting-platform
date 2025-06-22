@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -25,6 +25,22 @@ export class AuthService {
 
     // Metoda generująca token JWT po pomyślnym zalogowaniu
     async login(user: User) {
+        const payload = { email: user.email, sub: user.id, role: user.role };
+        return {
+            access_token: this.jwtService.sign(payload),
+        };
+    }
+
+    async impersonate(userIdToImpersonate: string) {
+        // Znajdujemy użytkownika, w którego chcemy się wcielić
+        // Używamy findOne z serwisu użytkowników, który zwraca usera bez hasła
+        const user = await this.usersService.findOne(userIdToImpersonate);
+        if (!user) {
+            throw new NotFoundException('User to impersonate not found');
+        }
+
+        // Generujemy dla niego standardowy token, tak jak przy logowaniu
+        // W przyszłości można tu dodać specjalne oznaczenie w tokenie, np. "impersonatedBy: adminId"
         const payload = { email: user.email, sub: user.id, role: user.role };
         return {
             access_token: this.jwtService.sign(payload),

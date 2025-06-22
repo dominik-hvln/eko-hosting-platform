@@ -1,19 +1,24 @@
-import { Controller, Post, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, UseGuards, Request, Param } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
+import { Roles } from './decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
+import { RolesGuard } from './guards/roles.guard';
 
 @Controller('auth')
 export class AuthController {
     constructor(private authService: AuthService) {}
 
-    // Ten endpoint będzie chroniony przez strategię 'local'
-    // Oznacza to, że zanim kod tej metody się wykona, Passport.js
-    // zweryfikuje email i hasło za pomocą naszej logiki w AuthService.
     @UseGuards(AuthGuard('local'))
     @Post('login')
     async login(@Request() req) {
-        // Jeśli doszliśmy tutaj, to znaczy, że użytkownik jest poprawny.
-        // Passport.js dołączył obiekt użytkownika do obiektu żądania (req.user).
         return this.authService.login(req.user);
+    }
+
+    @Post('impersonate/:userId')
+    @Roles(Role.ADMIN) // Tylko admin może używać tej funkcji
+    @UseGuards(AuthGuard('jwt'), RolesGuard)
+    async impersonate(@Param('userId') userId: string) {
+        return this.authService.impersonate(userId);
     }
 }
