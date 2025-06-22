@@ -1,11 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Ticket } from './entities/ticket.entity';
 import { DataSource, Repository } from 'typeorm';
 import { TicketMessage } from '../ticket-messages/entities/ticket-message.entity';
-import { CreateTicketMessageDto } from '../ticket-messages/dto/create-ticket-message.dto';
+import { Role } from '../common/enums/role.enum';
 import { TicketStatus } from '../common/enums/ticket-status.enum';
+import { CreateMessageDto } from './dto/create-message.dto';
 
 @Injectable()
 export class TicketsService {
@@ -17,7 +18,6 @@ export class TicketsService {
       private readonly dataSource: DataSource,
   ) {}
 
-  // Metoda create() pozostaje bez zmian...
   async create(createTicketDto: CreateTicketDto, authorId: string): Promise<Ticket> {
     return this.dataSource.transaction(async (manager) => {
       const newTicket = manager.create(Ticket, {
@@ -35,79 +35,60 @@ export class TicketsService {
       });
       await manager.save(newMessage);
 
-      // Zwracamy ticket z załadowaną relacją do wiadomości, aby odpowiedź była kompletna
-      const result = await manager.findOne(Ticket, {
-        where: { id: newTicket.id },
-        relations: ['author', 'messages'],
-      });
-      return result!;
+      return manager.findOneByOrFail(Ticket, { id: newTicket.id });
     });
   }
 
-  // Znajduje wszystkie zgłoszenia dla danego użytkownika
+  async addMessage(
+      ticketId: string,
+      createMessageDto: CreateMessageDto,
+      user: { userId: string; role: Role },
+  ): Promise<TicketMessage> {
+    // Używamy findOne, aby pobrać ticket i zweryfikować uprawnienia
+    const ticket = await this.findOne(ticketId, user);
+
+    const newMessage = this.ticketMessagesRepository.create({
+      content: createMessageDto.content,
+      ticket: ticket,
+      author: { id: user.userId },
+    });
+
+    if (ticket.status === TicketStatus.OPEN) {
+      ticket.status = TicketStatus.IN_PROGRESS;
+      await this.ticketsRepository.save(ticket);
+    }
+
+    return this.ticketMessagesRepository.save(newMessage);
+  }
+
   async findAllForUser(authorId: string): Promise<Ticket[]> {
     return this.ticketsRepository.find({
-      where: {
-        author: { id: authorId },
-      },
-      // Sortujemy od najnowszych
-      order: {
-        updatedAt: 'DESC',
-      },
+      where: { author: { id: authorId } },
+      order: { updatedAt: 'DESC' },
     });
   }
 
-  // Znajduje jedno zgłoszenie, ale sprawdza, czy należy do zalogowanego użytkownika
-  async findOneForUser(id: string, authorId: string): Promise<Ticket> {
+  async findAllForAdmin(): Promise<Ticket[]> {
+    return this.ticketsRepository.find({
+      relations: { author: true },
+      order: { updatedAt: 'DESC' },
+    });
+  }
+
+  async findOne(id: string, user: { userId: string; role: Role }): Promise<Ticket> {
     const ticket = await this.ticketsRepository.findOne({
-      // Warunek jest podwójny: ID ticketa musi się zgadzać ORAZ ID autora musi się zgadzać.
-      // To jest kluczowe dla bezpieczeństwa, aby użytkownik nie mógł odczytać cudzego zgłoszenia.
-      where: {
-        id: id,
-        author: { id: authorId },
-      },
-      // Ładujemy relacje: wiadomości, autorów wiadomości oraz autora i przypisanego pracownika ticketa
+      where: { id },
       relations: ['messages', 'messages.author', 'author', 'assignee'],
     });
 
     if (!ticket) {
       throw new NotFoundException(`Ticket with ID "${id}" not found`);
     }
+
+    if (user.role !== Role.ADMIN && ticket.author.id !== user.userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
     return ticket;
-  }
-
-  async addMessage(
-      ticketId: string,
-      authorId: string,
-      createMessageDto: CreateTicketMessageDto,
-  ): Promise<TicketMessage> {
-    // 1. Najpierw sprawdzamy, czy użytkownik ma dostęp do tego ticketa
-    const ticket = await this.findOneForUser(ticketId, authorId);
-
-    // 2. Tworzymy nową wiadomość
-    const newMessage = this.ticketMessagesRepository.create({
-      content: createMessageDto.content,
-      ticket: ticket,
-      author: { id: authorId },
-    });
-
-    // 3. Zmieniamy status ticketa, jeśli odpowiada klient
-    // (w przyszłości dodamy logikę dla pracownika)
-    ticket.status = TicketStatus.IN_PROGRESS;
-    await this.ticketsRepository.save(ticket);
-
-    // 4. Zapisujemy nową wiadomość
-    return this.ticketMessagesRepository.save(newMessage);
-  }
-
-  async findAllForAdmin(): Promise<Ticket[]> {
-    return this.ticketsRepository.find({
-      relations: {
-        author: true, // Dołączamy dane autora (w tym email)
-      },
-      order: {
-        updatedAt: 'DESC', // Sortujemy od ostatnio aktualizowanych
-      },
-    });
   }
 }

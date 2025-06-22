@@ -1,60 +1,45 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  UseGuards,
-  Request,
-  Param,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { CreateTicketMessageDto } from '../ticket-messages/dto/create-ticket-message.dto';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { CreateMessageDto } from './dto/create-message.dto';
 
 @Controller('tickets')
 @UseGuards(AuthGuard('jwt'))
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
+  @Get('admin/all')
+  @Roles(Role.ADMIN)
+  @UseGuards(RolesGuard)
+  findAllForAdmin() {
+    return this.ticketsService.findAllForAdmin();
+  }
+
   @Post()
   create(@Body() createTicketDto: CreateTicketDto, @Request() req) {
-    const authorId = req.user.userId;
-    return this.ticketsService.create(createTicketDto, authorId);
+    return this.ticketsService.create(createTicketDto, req.user.userId);
   }
 
-  // Zwraca listę ticketów zalogowanego użytkownika
   @Get()
-  findAll(@Request() req) {
-    const authorId = req.user.userId;
-    return this.ticketsService.findAllForUser(authorId);
+  findAllForUser(@Request() req) {
+    return this.ticketsService.findAllForUser(req.user.userId);
   }
 
-  // Zwraca szczegóły jednego ticketa wraz z całą konwersacją
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req) {
-    const authorId = req.user.userId;
-    return this.ticketsService.findOneForUser(id, authorId);
+    return this.ticketsService.findOne(id, req.user);
   }
 
-  // Endpoint do dodawania wiadomości do konkretnego zgłoszenia
   @Post(':id/messages')
   addMessage(
       @Param('id') id: string,
+      @Body() createMessageDto: CreateMessageDto,
       @Request() req,
-      @Body() createMessageDto: CreateTicketMessageDto,
   ) {
-    const authorId = req.user.userId;
-    return this.ticketsService.addMessage(id, authorId, createMessageDto);
-  }
-
-  @Get('admin/all')
-  @Roles(Role.ADMIN) // Tylko admin może wywołać tę metodę
-  @UseGuards(RolesGuard) // Używamy naszego strażnika ról
-  findAllForAdmin() {
-    return this.ticketsService.findAllForAdmin();
+    return this.ticketsService.addMessage(id, createMessageDto, req.user);
   }
 }
