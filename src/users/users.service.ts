@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  UnauthorizedException
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,6 +12,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Wallet } from '../wallet/entities/wallet.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class UsersService {
@@ -80,6 +82,36 @@ export class UsersService {
     const updatedUser = await this.usersRepository.save(user);
     const { password, ...result } = updatedUser;
     return result;
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    // Znajdujemy pełny obiekt użytkownika, włącznie z hasłem
+    const user = await this.usersRepository.findOneBy({ id: userId });
+    if (!user) {
+      // Ten błąd teoretycznie nie powinien wystąpić, bo user jest z tokenu
+      throw new NotFoundException('User not found');
+    }
+
+    // 1. Weryfikujemy, czy stare hasło podane przez użytkownika zgadza się z tym w bazie
+    const isPasswordMatching = await bcrypt.compare(
+        changePasswordDto.oldPassword,
+        user.password,
+    );
+
+    if (!isPasswordMatching) {
+      throw new UnauthorizedException('Niepoprawne stare hasło.');
+    }
+
+    // 2. Hashujemy nowe hasło
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, salt);
+
+    // 3. Zapisujemy nowe hasło w bazie danych
+    user.password = hashedPassword;
+    await this.usersRepository.save(user);
+
+    // Nie zwracamy nic wrażliwego
+    return { message: 'Hasło zostało pomyślnie zmienione.' };
   }
 
   async remove(id: string): Promise<void> {

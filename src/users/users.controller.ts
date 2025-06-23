@@ -9,6 +9,7 @@ import {
   Patch,
   Delete,
 } from '@nestjs/common';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -33,6 +34,13 @@ export class UsersController {
   getProfile(@Request() req) {
     // Zwraca profil zalogowanego użytkownika (zwróci tylko ID i email)
     return this.usersService.findOne(req.user.userId);
+  }
+
+  @Patch('me/change-password')
+  @UseGuards(AuthGuard('jwt')) // Tylko zalogowany użytkownik może zmienić SWOJE hasło
+  changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto) {
+    const userId = req.user.userId;
+    return this.usersService.changePassword(userId, changePasswordDto);
   }
 
   // --- ENDPOINTY TYLKO DLA ADMINA ---
