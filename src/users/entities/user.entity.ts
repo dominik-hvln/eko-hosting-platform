@@ -15,6 +15,7 @@ import { Ticket } from '../../tickets/entities/ticket.entity';
 import { TicketMessage } from '../../ticket-messages/entities/ticket-message.entity';
 import { MigrationRequest } from '../../migrations/entities/migration.entity';
 import { Invoice } from '../../invoices/entities/invoice.entity';
+import { PaymentRequest } from '../../payment-requests/entities/payment-request.entity';
 
 @Entity({ name: 'users' }) // Mówi TypeORM, że ta klasa to encja mapowana na tabelę 'users'
 export class User {
@@ -91,4 +92,7 @@ export class User {
 
     @OneToMany(() => Invoice, (invoice) => invoice.user)
     invoices: Invoice[];
+
+    @OneToMany(() => PaymentRequest, (request) => request.user)
+    paymentRequests: PaymentRequest[];
 }
