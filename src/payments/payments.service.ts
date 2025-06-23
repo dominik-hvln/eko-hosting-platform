@@ -1,18 +1,21 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { StripeService } from './providers/stripe.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Wallet } from '../wallet/entities/wallet.entity';
-import { DataSource, Repository } from 'typeorm';
-import { Transaction } from '../transactions/entities/transaction.entity';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 import Stripe from 'stripe';
+import { DataSource, Repository } from 'typeorm';
+import { Role } from '../common/enums/role.enum';
+import { ServiceStatus } from '../common/enums/service-status.enum';
 import { TransactionStatus } from '../common/enums/transaction-status.enum';
 import { TransactionType } from '../common/enums/transaction-type.enum';
-import { PayUService } from './providers/payu.service';
-import { User } from '../users/entities/user.entity';
-import * as crypto from 'crypto';
 import { InvoicesService } from '../invoices/invoices.service';
+import { Service } from '../services/entities/service.entity';
+import { ServicesService } from '../services/services.service';
+import { Transaction } from '../transactions/entities/transaction.entity';
+import { User } from '../users/entities/user.entity';
+import { Wallet } from '../wallet/entities/wallet.entity';
+import { CreatePaymentDto } from './dto/create-payment.dto';
+import { PayUService } from './providers/payu.service';
+import { StripeService } from './providers/stripe.service';
 
 @Injectable()
 export class PaymentsService {
@@ -21,168 +24,122 @@ export class PaymentsService {
       private readonly payuService: PayUService,
       private readonly configService: ConfigService,
       private readonly invoicesService: InvoicesService,
-      @InjectRepository(Wallet)
-      private readonly walletsRepository: Repository<Wallet>,
-      @InjectRepository(Transaction)
-      private readonly transactionsRepository: Repository<Transaction>,
+      private readonly servicesService: ServicesService,
       private readonly dataSource: DataSource,
   ) {}
 
-  async createTopUpSession(
-      createPaymentDto: CreatePaymentDto,
-      user: Omit<User, 'password'>,
-      provider: 'stripe' | 'payu',
-  ) {
+  async createTopUpSession(user: Omit<User, 'password'>, createPaymentDto: CreatePaymentDto, provider: 'stripe' | 'payu') {
     const args = {
       amount: createPaymentDto.amount * 100,
       currency: 'pln',
       userEmail: user.email,
       successUrl: 'http://localhost:3000/payment/success',
       cancelUrl: 'http://localhost:3000/payment/cancel',
+      metadata: { type: 'wallet_top_up' },
     };
+    if (provider === 'stripe') return this.stripeService.createPaymentSession(args);
+    if (provider === 'payu') return this.payuService.createPaymentSession(args);
+    throw new BadRequestException('Invalid payment provider');
+  }
 
-    // Używamy switcha, aby wybrać odpowiedni adapter
-    switch (provider) {
-      case 'stripe':
-        return this.stripeService.createPaymentSession(args);
-      case 'payu':
-        return this.payuService.createPaymentSession(args);
-      default:
-        throw new BadRequestException('Invalid payment provider');
-    }
+  async createServiceRenewalSession(userId: string, serviceId: string) {
+    const service = await this.servicesService.findOneForUser(serviceId, userId);
+
+    // Krok 1: Jawnie potraktuj cenę jako string
+    const priceString: string = String(service.plan.price);
+
+    // Krok 2: Sparsuj ten string na liczbę
+    const priceFloat: number = parseFloat(priceString);
+
+    // Krok 3: Przekonwertuj na grosze jako liczbę całkowitą
+    const amountInGr: number = Math.round(priceFloat * 100);
+
+    const args = {
+      amount: amountInGr, // Teraz przekazujemy tu pewny 'number'
+      currency: 'pln',
+      userEmail: service.user.email,
+      successUrl: `http://localhost:3000/dashboard/services/${serviceId}?payment=success`,
+      cancelUrl: `http://localhost:3000/dashboard/services/${serviceId}`,
+      metadata: {
+        type: 'service_renewal',
+        serviceId: service.id,
+      },
+    };
+    return this.stripeService.createPaymentSession(args);
   }
 
   async handleStripeWebhook(signature: string, rawBody: Buffer) {
-    const stripe = new Stripe(
-        this.configService.get<string>('STRIPE_SECRET_KEY')!,
-        { apiVersion: '2025-05-28.basil' },
-    );
-
+    const stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY')!, { apiVersion: '2025-05-28.basil' });
     let event: Stripe.Event;
-
     try {
-      event = stripe.webhooks.constructEvent(
-          rawBody,
-          signature,
-          this.configService.get<string>('STRIPE_WEBHOOK_SECRET')!,
-      );
+      event = stripe.webhooks.constructEvent(rawBody, signature, this.configService.get<string>('STRIPE_WEBHOOK_SECRET')!);
     } catch (err) {
       throw new BadRequestException(`Webhook Error: ${err.message}`);
     }
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
-      const customerEmail = session.customer_email;
-      const amountTotal = session.amount_total;
-
-      if (!customerEmail || !amountTotal) {
-        console.error(`Webhook event "checkout.session.completed" is missing data. Session ID: ${session.id}`);
-        return { received: true, message: 'Event ignored due to missing data.' };
+      if (session.metadata?.type === 'service_renewal') {
+        await this.handleServiceRenewalPayment(session);
+      } else {
+        await this.handleWalletTopUpPayment(session);
       }
-
-      await this.dataSource.transaction(async (manager) => {
-        const wallet = await manager.findOne(Wallet, {
-          where: { user: { email: customerEmail } },
-          relations: ['user'],
-        });
-
-        if (!wallet) {
-          console.error('Wallet not found for email:', customerEmail);
-          return;
-        }
-
-        const existingTransaction = await manager.findOne(Transaction, {
-          where: { providerTransactionId: session.id },
-        });
-        if (existingTransaction) {
-          console.log('Transaction already processed:', session.id);
-          return;
-        }
-
-        const amountToAdd = amountTotal / 100;
-        wallet.balance = parseFloat(wallet.balance.toString()) + amountToAdd;
-        await manager.save(wallet);
-
-        const newTransaction = manager.create(Transaction, {
-          wallet: wallet,
-          amount: amountToAdd,
-          currency: 'pln',
-          status: TransactionStatus.COMPLETED,
-          type: TransactionType.TOP_UP,
-          provider: 'stripe',
-          providerTransactionId: session.id,
-        });
-        await manager.save(newTransaction);
-
-        await this.invoicesService.createForTransaction(wallet.user, newTransaction);
-      });
     }
     return { received: true };
   }
 
-  async handlePayuWebhook(signatureHeader: string, rawBody: Buffer) {
-    // 1. Weryfikacja podpisu - krok bezpieczeństwa
-    const secondKey = this.configService.get<string>('PAYU_SECOND_KEY')!;
-    const bodyString = rawBody.toString();
-    const expectedSignature = crypto
-        .createHash('md5')
-        .update(bodyString + secondKey)
-        .digest('hex');
+  private async handleWalletTopUpPayment(session: Stripe.Checkout.Session) {
+    const { customer_email: customerEmail, amount_total: amountTotal, id: sessionId } = session;
+    if (!customerEmail || !amountTotal) return;
 
-    // Wyciągamy właściwy podpis z nagłówka
-    const signature = signatureHeader.split(';').reduce((acc, part) => {
-      const [key, value] = part.split('=');
-      acc[key.trim()] = value;
-      return acc;
-    }, {})['signature'];
+    return this.dataSource.transaction(async (manager) => {
+      const walletRepo = manager.getRepository(Wallet);
+      const transactionRepo = manager.getRepository(Transaction);
+      const wallet = await walletRepo.findOne({ where: { user: { email: customerEmail } }, relations: ['user'] });
+      if (!wallet) return;
 
-    if (signature !== expectedSignature) {
-      throw new BadRequestException('Invalid PayU signature');
-    }
+      const existingTx = await transactionRepo.findOne({ where: { providerTransactionId: sessionId } });
+      if (existingTx) return;
 
-    // 2. Obsługa zdarzenia
-    const notification = JSON.parse(bodyString);
+      const amountToAdd = amountTotal / 100;
+      wallet.balance = parseFloat(wallet.balance.toString()) + amountToAdd;
+      await walletRepo.save(wallet);
 
-    if (notification.order.status === 'COMPLETED') {
-      const orderId = notification.order.orderId;
-      const customerEmail = notification.order.buyer.email;
-      const amountTotal = notification.order.totalAmount; // kwota w groszach
-
-      await this.dataSource.transaction(async (manager) => {
-        const wallet = await manager.findOne(Wallet, {
-          where: { user: { email: customerEmail } },
-        });
-
-        if (!wallet) {
-          console.error('Wallet not found for email:', customerEmail);
-          return;
-        }
-
-        const existingTransaction = await manager.findOne(Transaction, {
-          where: { providerTransactionId: orderId },
-        });
-        if (existingTransaction) {
-          console.log('Transaction already processed:', orderId);
-          return;
-        }
-
-        const amountToAdd = parseInt(amountTotal) / 100;
-        wallet.balance = parseFloat(wallet.balance.toString()) + amountToAdd;
-        await manager.save(wallet);
-
-        const newTransaction = manager.create(Transaction, {
-          wallet: wallet,
-          amount: amountToAdd,
-          currency: 'pln',
-          status: TransactionStatus.COMPLETED,
-          type: TransactionType.TOP_UP,
-          provider: 'payu',
-          providerTransactionId: orderId,
-        });
-        await manager.save(newTransaction);
+      const newTx = transactionRepo.create({
+        wallet, amount: amountToAdd, currency: 'pln', status: TransactionStatus.COMPLETED,
+        type: TransactionType.TOP_UP, provider: 'stripe', providerTransactionId: sessionId,
       });
-    }
-    // PayU oczekuje odpowiedzi 200 OK, aby wiedzieć, że powiadomienie dotarło
-    return { received: true };
+      await transactionRepo.save(newTx);
+      await this.invoicesService.createForTransaction(wallet.user, newTx);
+    });
   }
+
+  private async handleServiceRenewalPayment(session: Stripe.Checkout.Session) {
+    const { serviceId } = session.metadata || {};
+    const { amount_total: amountTotal, id: sessionId } = session;
+    if (!serviceId || !amountTotal) return;
+
+    return this.dataSource.transaction(async (manager) => {
+      const serviceRepo = manager.getRepository(Service);
+      const transactionRepo = manager.getRepository(Transaction);
+      const service = await serviceRepo.findOne({ where: { id: serviceId }, relations: ['user', 'user.wallet'] });
+      if (!service) return;
+
+      const newExpiryDate = service.expiresAt ? new Date(service.expiresAt) : new Date();
+      newExpiryDate.setMonth(newExpiryDate.getMonth() + 1);
+      service.expiresAt = newExpiryDate;
+      service.status = ServiceStatus.ACTIVE;
+      await serviceRepo.save(service);
+
+      const amount = amountTotal / 100;
+      const newTx = transactionRepo.create({
+        wallet: service.user.wallet, amount: -amount, currency: 'pln', status: TransactionStatus.COMPLETED,
+        type: TransactionType.PAYMENT, provider: 'stripe', providerTransactionId: sessionId,
+      });
+      await transactionRepo.save(newTx);
+      await this.invoicesService.createForTransaction(service.user, newTx);
+    });
+  }
+
+  async handlePayuWebhook(signatureHeader: string, rawBody: Buffer) { /* Puste na razie */ }
 }

@@ -5,7 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Service } from './entities/service.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Service])],
+  imports: [TypeOrmModule.forFeature([Service])], // Usuwamy UsersModule
   controllers: [ServicesController],
   providers: [ServicesService],
   exports: [ServicesService],

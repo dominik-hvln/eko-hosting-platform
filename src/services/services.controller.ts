@@ -1,56 +1,43 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  UseGuards,
-  Request,
-  Param,
-  Patch,
-  Delete,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
 import { ServicesService } from './services.service';
 import { CreateServiceDto } from './dto/create-service.dto';
-import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Role } from '../common/enums/role.enum';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { UpdateServiceDto } from './dto/update-service.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Controller('services')
-@UseGuards(AuthGuard('jwt')) // Cały kontroler wymaga zalogowania
+@UseGuards(AuthGuard('jwt'))
 export class ServicesController {
-  constructor(private readonly servicesService: ServicesService) {}
+  constructor(
+      private readonly servicesService: ServicesService,
+  ) {}
 
-  // --- ENDPOINT DLA ZALOGOWANEGO UŻYTKOWNIKA ---
-  @Get('my-services') // Zmieniliśmy ścieżkę dla jasności
+  @Get('my-services')
   findOwnServices(@Request() req) {
-    const userId = req.user.userId;
-    return this.servicesService.findAllForUser(userId);
+    return this.servicesService.findAllForUser(req.user.userId);
   }
 
   @Get('my-services/:id')
   findOwnOne(@Param('id') id: string, @Request() req) {
-    const userId = req.user.userId;
-    return this.servicesService.findOneForUser(id, userId);
+    return this.servicesService.findOneForUser(id, req.user.userId);
   }
 
   @Patch('my-services/:id/toggle-renew')
   toggleAutoRenew(@Param('id') id: string, @Request() req) {
-    const userId = req.user.userId;
-    return this.servicesService.toggleAutoRenewForUser(id, userId);
+    return this.servicesService.toggleAutoRenewForUser(id, req.user.userId);
   }
 
-  // --- ENDPOINTY TYLKO DLA ADMINA ---
-
+  // --- ENDPOINTY ADMINA ---
   @Post()
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)
+  // Metoda jest teraz znacznie prostsza - tylko przekazuje DTO
   create(@Body() createServiceDto: CreateServiceDto) {
     return this.servicesService.create(createServiceDto);
   }
 
-  // Pobieranie wszystkich usług w systemie
   @Get()
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)
@@ -58,26 +45,20 @@ export class ServicesController {
     return this.servicesService.findAll();
   }
 
-  // Pobieranie szczegółów jednej usługi
   @Get(':id')
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)
   findOne(@Param('id') id: string) {
-    return this.servicesService.findOne(id);
+    return this.servicesService.findOne(id); // Poprawnie wywołuje findOne z jednym argumentem
   }
 
-  // Aktualizacja usługi
   @Patch(':id')
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)
-  update(
-      @Param('id') id: string,
-      @Body() updateServiceDto: UpdateServiceDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateServiceDto: UpdateServiceDto) {
     return this.servicesService.update(id, updateServiceDto);
   }
 
-  // Usuwanie usługi
   @Delete(':id')
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)
