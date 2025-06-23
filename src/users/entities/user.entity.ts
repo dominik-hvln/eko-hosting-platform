@@ -33,8 +33,14 @@ export class User {
     @Column({ name: 'is_active', default: true })
     isActive: boolean;
 
-    @Column({ name: 'full_name', type: 'varchar', length: 255, nullable: true })
-    fullName: string | null;
+    @Column({ name: 'first_name', type: 'varchar', length: 100, nullable: true })
+    firstName: string | null;
+
+    @Column({ name: 'last_name', type: 'varchar', length: 100, nullable: true })
+    lastName: string | null;
+
+    @Column({ name: 'company_name', type: 'varchar', length: 255, nullable: true })
+    companyName: string | null;
 
     @Column({ name: 'tax_id', type: 'varchar', length: 50, nullable: true })
     taxId: string | null;

@@ -19,7 +19,17 @@ export class UpdateProfileDto {
     @IsString()
     @IsOptional()
     @MaxLength(100)
-    fullName: string;
+    firstName: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(100)
+    lastName: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(255)
+    companyName: string;
 
     @IsString()
     @IsOptional()
