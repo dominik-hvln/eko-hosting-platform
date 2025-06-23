@@ -32,8 +32,9 @@ export class Transaction {
     @Column({ name: 'provider_transaction_id', unique: true })
     providerTransactionId: string; // ID transakcji z systemu dostawcy (np. Stripe)
 
-    // --- RELACJA Z PORTFELEM ---
-    // Wiele transakcji może należeć do jednego portfela
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    description: string | null;
+
     @ManyToOne(() => Wallet, (wallet) => wallet.transactions)
     wallet: Wallet;
 

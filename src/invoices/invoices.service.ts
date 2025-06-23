@@ -5,8 +5,9 @@
     import { User } from '../users/entities/user.entity';
     import { Transaction } from '../transactions/entities/transaction.entity';
     import * as PDFDocument from 'pdfkit';
-    import * as path from 'path'; // <-- NOWY IMPORT
-    import * as fs from 'fs'; // <-- NOWY IMPORT
+    import * as path from 'path';
+    import * as fs from 'fs';
+    import { TransactionType } from '../common/enums/transaction-type.enum';
 
     @Injectable()
     export class InvoicesService {
@@ -20,17 +21,26 @@
         const invoiceNumber = `FV-PRO/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${count + 1}`;
         const issueDate = new Date();
         const amountInGr = Math.round(parseFloat(transaction.amount.toString()) * 100);
+        const isPayment = amountInGr < 0;
+        const grossValue = isPayment ? -amountInGr : amountInGr;
+
         const vatRate = 23;
-        const netValue = Math.round(amountInGr / (1 + vatRate / 100));
-        const vatValue = amountInGr - netValue;
+        const netValue = Math.round(grossValue / (1 + vatRate / 100));
+        const vatValue = grossValue - netValue;
+
         const buyerName = user.companyName || `${user.firstName || ''} ${user.lastName || ''}`.trim();
+
+        let itemName = 'Doładowanie portfela w serwisie';
+        if (transaction.type === TransactionType.PAYMENT && transaction.description) {
+          itemName = transaction.description;
+        }
 
         const invoice = this.invoicesRepository.create({
           invoiceNumber, issueDate, saleDate: issueDate,
           buyer: { name: buyerName, taxId: user.taxId, addressLine1: user.addressLine1, zipCode: user.zipCode, city: user.city, country: user.country },
           seller: { name: 'EKO-HOSTING Sp. z o.o.', taxId: '123-456-78-90', addressLine1: 'ul. Wymyślona 1', zipCode: '00-000', city: 'Warszawa', country: 'Polska' },
-          items: [{ name: 'Doładowanie portfela w serwisie', quantity: 1, unitPrice: netValue, netValue, vatRate, vatValue, grossValue: amountInGr }],
-          totalNetValue: netValue, totalGrossValue: amountInGr, user: user,
+          items: [{ name: itemName, quantity: 1, unitPrice: netValue, netValue, vatRate, vatValue, grossValue }],
+          totalNetValue: netValue, totalGrossValue: grossValue, user: user,
         });
 
         return this.invoicesRepository.save(invoice);

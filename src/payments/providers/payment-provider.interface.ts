@@ -1,10 +1,12 @@
 // Argumenty potrzebne do stworzenia sesji płatności
 export interface CreateSessionArgs {
-    amount: number; // kwota w groszach/centach
-    currency: string; // np. 'pln', 'eur'
+    amount: number;
+    currency: string;
     userEmail: string;
     successUrl: string;
     cancelUrl: string;
+    paymentDescription: string;
+    metadata?: { [key: string]: string | number | null };
 }
 
 // Wynik, jaki zwraca metoda tworząca sesję
