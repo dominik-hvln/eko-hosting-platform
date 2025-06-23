@@ -16,6 +16,7 @@ COPY --from=builder /usr/src/app/package.json ./package.json
 # ----> DODAJEMY TĘ LINIĘ <----
 # Kopiujemy pliki konfiguracyjne TypeScripta
 COPY --from=builder /usr/src/app/tsconfig*.json ./
+COPY assets ./assets
 
 EXPOSE 3000
 CMD [ "node", "dist/main" ]

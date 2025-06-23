@@ -8,12 +8,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Wallet } from '../wallet/entities/wallet.entity';
 import { Transaction } from '../transactions/entities/transaction.entity';
 import { PayUService } from './providers/payu.service';
+import { InvoicesModule } from '../invoices/invoices.module';
 
 @Module({
   imports: [
     ConfigModule,
     AuthModule,
     TypeOrmModule.forFeature([Wallet, Transaction]),
+    InvoicesModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, StripeService, PayUService],

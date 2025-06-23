@@ -12,6 +12,7 @@ import { TransactionType } from '../common/enums/transaction-type.enum';
 import { PayUService } from './providers/payu.service';
 import { User } from '../users/entities/user.entity';
 import * as crypto from 'crypto';
+import { InvoicesService } from '../invoices/invoices.service';
 
 @Injectable()
 export class PaymentsService {
@@ -19,11 +20,12 @@ export class PaymentsService {
       private readonly stripeService: StripeService,
       private readonly payuService: PayUService,
       private readonly configService: ConfigService,
+      private readonly invoicesService: InvoicesService,
       @InjectRepository(Wallet)
       private readonly walletsRepository: Repository<Wallet>,
       @InjectRepository(Transaction)
       private readonly transactionsRepository: Repository<Transaction>,
-      private readonly dataSource: DataSource, // Wstrzykujemy DataSource do obsługi transakcji
+      private readonly dataSource: DataSource,
   ) {}
 
   async createTopUpSession(
@@ -74,15 +76,14 @@ export class PaymentsService {
       const amountTotal = session.amount_total;
 
       if (!customerEmail || !amountTotal) {
-        console.error(
-            `Webhook event "checkout.session.completed" is missing data. Session ID: ${session.id}`,
-        );
+        console.error(`Webhook event "checkout.session.completed" is missing data. Session ID: ${session.id}`);
         return { received: true, message: 'Event ignored due to missing data.' };
       }
 
       await this.dataSource.transaction(async (manager) => {
         const wallet = await manager.findOne(Wallet, {
           where: { user: { email: customerEmail } },
+          relations: ['user'],
         });
 
         if (!wallet) {
@@ -112,6 +113,8 @@ export class PaymentsService {
           providerTransactionId: session.id,
         });
         await manager.save(newTransaction);
+
+        await this.invoicesService.createForTransaction(wallet.user, newTransaction);
       });
     }
     return { received: true };
