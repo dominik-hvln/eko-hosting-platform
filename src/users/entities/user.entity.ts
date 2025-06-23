@@ -6,10 +6,10 @@ import {
     Column,
     CreateDateColumn,
     UpdateDateColumn,
+    OneToMany,
+    OneToOne,
 } from 'typeorm';
-import { OneToMany } from 'typeorm';
 import { Service } from '../../services/entities/service.entity';
-import { OneToOne } from 'typeorm';
 import { Wallet } from '../../wallet/entities/wallet.entity';
 import { Ticket } from '../../tickets/entities/ticket.entity';
 import { TicketMessage } from '../../ticket-messages/entities/ticket-message.entity';
@@ -27,15 +27,32 @@ export class User {
     @Column() // Kolumna z hasłem (będziemy je hashować przed zapisem)
     password: string;
 
-    @Column({
-        type: 'enum',
-        enum: Role,
-        default: Role.USER, // Domyślna rola to 'user'
-    })
+    @Column({ type: 'enum', enum: Role, default: Role.USER })
     role: Role;
 
-    @Column({ default: true }) // Kolumna do aktywacji/deaktywacji konta
+    @Column({ name: 'is_active', default: true })
     isActive: boolean;
+
+    @Column({ name: 'full_name', type: 'varchar', length: 255, nullable: true })
+    fullName: string | null;
+
+    @Column({ name: 'tax_id', type: 'varchar', length: 50, nullable: true })
+    taxId: string | null;
+
+    @Column({ name: 'address_line_1', type: 'varchar', length: 255, nullable: true })
+    addressLine1: string | null;
+
+    @Column({ name: 'address_line_2', type: 'varchar', length: 255, nullable: true })
+    addressLine2: string | null;
+
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    city: string | null;
+
+    @Column({ name: 'zip_code', type: 'varchar', length: 20, nullable: true })
+    zipCode: string | null;
+
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    country: string | null;
 
     @CreateDateColumn() // Automatycznie ustawiana data utworzenia
     createdAt: Date;
@@ -64,4 +81,5 @@ export class User {
 
     @OneToMany(() => MigrationRequest, (request) => request.user)
     migrationRequests: MigrationRequest[];
+
 }

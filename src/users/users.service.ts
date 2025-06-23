@@ -11,7 +11,7 @@ import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Wallet } from '../wallet/entities/wallet.entity';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserDto, UpdateProfileDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
@@ -26,7 +26,6 @@ export class UsersService {
   async create(
       createUserDto: CreateUserDto,
   ): Promise<Omit<User, 'password'>> {
-    // ... istniejąca metoda create bez zmian ...
     const { email, password } = createUserDto;
     const existingUser = await this.usersRepository.findOneBy({ email });
     if (existingUser) {
@@ -112,6 +111,18 @@ export class UsersService {
 
     // Nie zwracamy nic wrażliwego
     return { message: 'Hasło zostało pomyślnie zmienione.' };
+  }
+
+  async updateProfile(userId: string, updateProfileDto: UpdateProfileDto): Promise<User> {
+    const user = await this.usersRepository.findOneBy({ id: userId });
+    if (!user) {
+      throw new NotFoundException(`User with ID "${userId}" not found`);
+    }
+
+    // Łączymy istniejące dane z nowymi
+    Object.assign(user, updateProfileDto);
+
+    return this.usersRepository.save(user);
   }
 
   async remove(id: string): Promise<void> {

@@ -16,7 +16,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserDto, UpdateProfileDto } from './dto/update-user.dto';
 
 @Controller('users')
 export class UsersController {
@@ -29,10 +29,9 @@ export class UsersController {
   }
 
   // --- ENDPOINT DLA ZALOGOWANYCH ---
-  @UseGuards(AuthGuard('jwt'))
   @Get('profile')
+  @UseGuards(AuthGuard('jwt'))
   getProfile(@Request() req) {
-    // Zwraca profil zalogowanego użytkownika (zwróci tylko ID i email)
     return this.usersService.findOne(req.user.userId);
   }
 
@@ -41,6 +40,13 @@ export class UsersController {
   changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto) {
     const userId = req.user.userId;
     return this.usersService.changePassword(userId, changePasswordDto);
+  }
+
+  @Patch('profile')
+  @UseGuards(AuthGuard('jwt'))
+  updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
+    const userId = req.user.userId;
+    return this.usersService.updateProfile(userId, updateProfileDto);
   }
 
   // --- ENDPOINTY TYLKO DLA ADMINA ---
