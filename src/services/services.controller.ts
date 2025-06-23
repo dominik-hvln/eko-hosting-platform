@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, HttpCode } from '@nestjs/common';
 import { ServicesService } from './services.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
@@ -62,6 +62,7 @@ export class ServicesController {
   @Delete(':id')
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)
+  @HttpCode(204)
   remove(@Param('id') id: string) {
     return this.servicesService.remove(id);
   }
