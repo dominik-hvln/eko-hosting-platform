@@ -16,6 +16,7 @@ import { TicketMessage } from '../../ticket-messages/entities/ticket-message.ent
 import { MigrationRequest } from '../../migrations/entities/migration.entity';
 import { Invoice } from '../../invoices/entities/invoice.entity';
 import { PaymentRequest } from '../../payment-requests/entities/payment-request.entity';
+import { EkoLevel } from '../../common/enums/eko-level.enum';
 
 @Entity({ name: 'users' }) // Mówi TypeORM, że ta klasa to encja mapowana na tabelę 'users'
 export class User {
@@ -61,6 +62,9 @@ export class User {
 
     @Column({ type: 'varchar', length: 100, nullable: true })
     country: string | null;
+
+    @Column({ name: 'eko_level', type: 'enum', enum: EkoLevel, default: EkoLevel.SEEDLING })
+    ekoLevel: EkoLevel;
 
     @CreateDateColumn() // Automatycznie ustawiana data utworzenia
     createdAt: Date;

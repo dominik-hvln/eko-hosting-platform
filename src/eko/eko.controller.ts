@@ -1,22 +1,26 @@
-import { Controller, Post, UseGuards, Request, Get } from '@nestjs/common';
+import { Controller, Get, Body, UseGuards, Patch } from '@nestjs/common';
 import { EkoService } from './eko.service';
 import { AuthGuard } from '@nestjs/passport';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { UpdateEkoSettingsDto } from './dto/update-eko-settings.dto';
 
 @Controller('eko')
-@UseGuards(AuthGuard('jwt')) // Tylko zalogowani użytkownicy mogą zbierać punkty
 export class EkoController {
   constructor(private readonly ekoService: EkoService) {}
 
-  // Endpoint symulujący akcję "włączyłem tryb ciemny"
-  @Post('dark-mode/enable')
-  addPointsForDarkMode(@Request() req) {
-    const userId = req.user.userId;
-    return this.ekoService.addPointsForDarkMode(userId);
+  @Get('settings')
+  @Roles(Role.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  getSettings() {
+    return this.ekoService.getSettings();
   }
 
-  @Get('summary')
-  getSummary(@Request() req) {
-    const userId = req.user.userId;
-    return this.ekoService.getSummaryForUser(userId);
+  @Patch('settings')
+  @Roles(Role.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  updateSettings(@Body() dto: UpdateEkoSettingsDto) {
+    return this.ekoService.updateSettings(dto);
   }
 }

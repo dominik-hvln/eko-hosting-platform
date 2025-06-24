@@ -1,45 +1,29 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Wallet } from '../wallet/entities/wallet.entity';
+import { EkoSettings } from './entities/eko-settings.entity';
 import { Repository } from 'typeorm';
-
-const POINTS_FOR_DARK_MODE = 10;
+import { UpdateEkoSettingsDto } from './dto/update-eko-settings.dto';
 
 @Injectable()
 export class EkoService {
   constructor(
-      @InjectRepository(Wallet)
-      private readonly walletsRepository: Repository<Wallet>,
+      @InjectRepository(EkoSettings)
+      private readonly settingsRepository: Repository<EkoSettings>,
   ) {}
 
-  async addPointsForDarkMode(userId: string): Promise<Wallet> {
-    // Znajdujemy portfel użytkownika
-    const wallet = await this.walletsRepository.findOneBy({
-      user: { id: userId },
-    });
-
-    if (!wallet) {
-      throw new NotFoundException(
-          `Wallet for user with ID "${userId}" not found`,
-      );
+  // Pobiera ustawienia. Jeśli nie istnieją, tworzy domyślne.
+  async getSettings(): Promise<EkoSettings> {
+    const settings = await this.settingsRepository.find();
+    if (settings.length > 0) {
+      return settings[0];
     }
-
-    // Dodajemy punkty i zapisujemy zmiany
-    wallet.ekoPoints += POINTS_FOR_DARK_MODE;
-    return this.walletsRepository.save(wallet);
+    return this.settingsRepository.save(new EkoSettings());
   }
-  async getSummaryForUser(userId: string): Promise<{ ekoPoints: number }> {
-    const wallet = await this.walletsRepository.findOneBy({
-      user: { id: userId },
-    });
 
-    if (!wallet) {
-      throw new NotFoundException(
-          `Wallet for user with ID "${userId}" not found`,
-      );
-    }
-
-    // Zwracamy tylko interesujące nas dane, a nie cały obiekt portfela
-    return { ekoPoints: wallet.ekoPoints };
+  // Aktualizuje ustawienia
+  async updateSettings(dto: UpdateEkoSettingsDto): Promise<EkoSettings> {
+    let settings = await this.getSettings();
+    Object.assign(settings, dto);
+    return this.settingsRepository.save(settings);
   }
 }

@@ -2,13 +2,12 @@ import { Module } from '@nestjs/common';
 import { EkoService } from './eko.service';
 import { EkoController } from './eko.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Wallet } from '../wallet/entities/wallet.entity'; // Importujemy encję Wallet
-import { AuthModule } from '../auth/auth.module'; // Importujemy, aby móc używać guardów
+import { EkoSettings } from './entities/eko-settings.entity'; // Poprawiona ścieżka
 
 @Module({
-  // Udostępniamy WalletRepository oraz mechanizmy autoryzacji
-  imports: [TypeOrmModule.forFeature([Wallet]), AuthModule],
+  imports: [TypeOrmModule.forFeature([EkoSettings])],
   controllers: [EkoController],
   providers: [EkoService],
+  exports: [EkoService], // Eksportujemy, aby inne moduły mogły z niego korzystać
 })
 export class EkoModule {}
