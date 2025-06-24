@@ -5,6 +5,7 @@ import { Service } from './entities/service.entity';
 import { Repository } from 'typeorm';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { User } from '../users/entities/user.entity';
+import { BillingCycle } from '../common/enums/billing-cycle.enum';
 
 @Injectable()
 export class ServicesService {
@@ -14,11 +15,25 @@ export class ServicesService {
   ) {}
 
   async create(createServiceDto: CreateServiceDto): Promise<Service> {
+    let expiresAt: Date | undefined = createServiceDto.expiresAt;
+
+    // Jeśli data wygaśnięcia nie została podana ręcznie, obliczamy ją automatycznie
+    if (!expiresAt) {
+      expiresAt = new Date();
+      if (createServiceDto.billingCycle === BillingCycle.YEARLY) {
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      } else {
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+      }
+    }
+
     const newService = this.servicesRepository.create({
       name: createServiceDto.name,
-      // Do stworzenia relacji wystarczy podać obiekty z samym ID
       plan: { id: createServiceDto.planId },
       user: { id: createServiceDto.userId },
+      billingCycle: createServiceDto.billingCycle,
+      autoRenew: createServiceDto.autoRenew,
+      expiresAt: expiresAt, // Używamy naszej nowej, obliczonej lub podanej daty
     });
     return this.servicesRepository.save(newService);
   }

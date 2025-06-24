@@ -19,6 +19,7 @@ import { StripeService } from './providers/stripe.service';
 import { PaymentRequestsService } from '../payment-requests/payment-requests.service';
 import { PaymentRequestStatus } from '../common/enums/payment-request-status.enum';
 import { PaymentRequest } from '../payment-requests/entities/payment-request.entity';
+import { BillingCycle } from '../common/enums/billing-cycle.enum';
 
 @Injectable()
 export class PaymentsService {
@@ -53,14 +54,19 @@ export class PaymentsService {
   async createServiceRenewalSession(userId: string, serviceId: string) {
     const service = await this.servicesService.findOneForUser(serviceId, userId);
 
-    // Krok 1: Jawnie potraktuj cenę jako string
-    const priceString: string = String(service.plan.price);
+    const isYearly = service.billingCycle === BillingCycle.YEARLY;
+    const price = isYearly ? service.plan.yearlyPrice : service.plan.price;
 
-    // Krok 2: Sparsuj ten string na liczbę
-    const priceFloat: number = parseFloat(priceString);
+    // --- OSTATECZNA POPRAWKA TUTAJ ---
+    if (price === null || price === undefined) {
+      throw new BadRequestException(
+          `Cena dla cyklu rozliczeniowego "${isYearly ? 'rocznego' : 'miesięcznego'}" w planie "${
+              service.plan.name
+          }" nie jest zdefiniowana.`,
+      );
+    }
 
-    // Krok 3: Przekonwertuj na grosze jako liczbę całkowitą
-    const amountInGr: number = Math.round(priceFloat * 100);
+    const amountInGr = Math.round(parseFloat(price) * 100);
 
     const args = {
       amount: amountInGr,
@@ -68,7 +74,9 @@ export class PaymentsService {
       userEmail: service.user.email,
       successUrl: `http://localhost:3000/dashboard/services/${serviceId}?payment=success`,
       cancelUrl: `http://localhost:3000/dashboard/services/${serviceId}`,
-      paymentDescription: `Odnowienie usługi: ${service.name}`, // NOWY OPIS
+      paymentDescription: `Odnowienie usługi: ${service.name} (${
+          isYearly ? 'rocznie' : 'miesięcznie'
+      })`,
       metadata: { type: 'service_renewal', serviceId: service.id },
     };
     return this.stripeService.createPaymentSession(args);

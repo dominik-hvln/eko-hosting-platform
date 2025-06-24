@@ -2,12 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Service } from '../services/entities/service.entity';
-import { DataSource, LessThan, Repository } from 'typeorm';
-import { Wallet } from '../wallet/entities/wallet.entity';
-import { Transaction } from '../transactions/entities/transaction.entity';
+import { LessThan, Repository } from 'typeorm';
 import { ServiceStatus } from '../common/enums/service-status.enum';
+import { Wallet } from '../wallet/entities/wallet.entity';
+import { Plan } from '../plans/entities/plan.entity';
+import { DataSource } from 'typeorm';
+import { Transaction } from '../transactions/entities/transaction.entity';
 import { TransactionStatus } from '../common/enums/transaction-status.enum';
 import { TransactionType } from '../common/enums/transaction-type.enum';
+import { BillingCycle } from '../common/enums/billing-cycle.enum';
 
 @Injectable()
 export class RenewalsService {
@@ -19,20 +22,20 @@ export class RenewalsService {
         private readonly dataSource: DataSource,
     ) {}
 
-    // Używamy dekoratora @Cron, aby ta metoda uruchamiała się cyklicznie.
-    // Dla celów testowych ustawiamy ją na "co 30 sekund".
-    // W produkcji byłoby to np. CronExpression.EVERY_DAY_AT_2AM
     @Cron(CronExpression.EVERY_30_SECONDS)
     async handleRenewals() {
         this.logger.log('--- Running renewals cron job! ---');
 
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
         const servicesToRenew = await this.servicesRepository.find({
             where: {
-                autoRenew: true, // Tylko te z włączonym autoodnawianiem
-                expiresAt: LessThan(new Date()), // Których data wygaśnięcia już minęła
-                status: ServiceStatus.ACTIVE, // Tylko te, które są obecnie aktywne
+                autoRenew: true,
+                expiresAt: LessThan(thirtyDaysFromNow),
+                status: ServiceStatus.ACTIVE,
             },
-            relations: ['user', 'user.wallet', 'plan'], // Ładujemy powiązane dane
+            relations: ['user', 'user.wallet', 'plan'],
         });
 
         if (servicesToRenew.length === 0) {
@@ -41,54 +44,66 @@ export class RenewalsService {
         }
 
         for (const service of servicesToRenew) {
+            // Sprawdzamy, czy usługa już wygasła
+            if (service.expiresAt && new Date(service.expiresAt) > new Date()) {
+                continue; // Pomijamy, jeśli data wygaśnięcia jest w przyszłości
+            }
+
             const wallet = service.user.wallet;
             const plan = service.plan;
-            const price = parseFloat(plan.price.toString());
-            const balance = parseFloat(wallet.balance.toString());
-
             this.logger.log(`Checking service ${service.id} for user ${service.user.email}`);
 
+            const isYearly = service.billingCycle === BillingCycle.YEARLY;
+            const priceString = isYearly ? plan.yearlyPrice : plan.price;
+
+            if (priceString === null || priceString === undefined) {
+                this.logger.warn(`Price for billing cycle "<span class="math-inline">\{service\.billingCycle\}" on plan "</span>{plan.name}" is not defined. Suspending service ${service.id}`);
+                await this.suspendService(service);
+                continue;
+            }
+
+            const price = parseFloat(priceString);
+            const balance = parseFloat(wallet.balance.toString());
+
             if (balance >= price) {
-                // Użytkownik ma środki - odnawiamy usługę
-                await this.renewService(service, wallet, plan, price);
+                await this.renewService(service, wallet, price, isYearly);
             } else {
-                // Brak środków - zawieszamy usługę
                 await this.suspendService(service);
             }
         }
     }
 
-    private async renewService(service: Service, wallet: Wallet, plan: any, price: number) {
+    private async renewService(service: Service, wallet: Wallet, price: number, isYearly: boolean) {
+        this.logger.log(`Renewing service ${service.id} for ${price} PLN.`);
         await this.dataSource.transaction(async (manager) => {
-            // 1. Pobieramy środki z portfela
-            wallet.balance -= price;
-            await manager.save(wallet);
+            const newBalance = parseFloat(wallet.balance.toString()) - price;
+            await manager.update(Wallet, wallet.id, { balance: newBalance });
 
-            // 2. Przedłużamy ważność usługi o miesiąc
-            const newExpiryDate = new Date(service.expiresAt!);
-            newExpiryDate.setMonth(newExpiryDate.getMonth() + 1);
+            // POPRAWKA: Jeśli expiresAt jest null, bazujemy na dacie dzisiejszej
+            const newExpiryDate = service.expiresAt ? new Date(service.expiresAt) : new Date();
+            if (isYearly) {
+                newExpiryDate.setFullYear(newExpiryDate.getFullYear() + 1);
+            } else {
+                newExpiryDate.setMonth(newExpiryDate.getMonth() + 1);
+            }
             service.expiresAt = newExpiryDate;
             await manager.save(service);
 
-            // 3. Tworzymy zapis w transakcjach
             const transaction = manager.create(Transaction, {
                 wallet: wallet,
-                amount: -price, // Ujemna kwota, bo to wydatek
+                amount: -price,
                 currency: 'pln',
                 status: TransactionStatus.COMPLETED,
                 type: TransactionType.PAYMENT,
-                provider: 'system',
-                providerTransactionId: `renewal-<span class="math-inline">\{service\.id\}\-</span>{Date.now()}`,
+                description: `Automatyczne odnowienie usługi: <span class="math-inline">\{service\.name\} \(</span>{ isYearly ? 'rocznie' : 'miesięcznie' })`,
             });
             await manager.save(transaction);
-
-            this.logger.log(`SUCCESS: Renewed service ${service.id}. New balance: ${wallet.balance}`);
         });
     }
 
     private async suspendService(service: Service) {
+        this.logger.warn(`Insufficient funds for service ${service.id}. Suspending.`);
         service.status = ServiceStatus.SUSPENDED;
         await this.servicesRepository.save(service);
-        this.logger.warn(`SUSPENDED: Service ${service.id} due to insufficient funds.`);
     }
 }

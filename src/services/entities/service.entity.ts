@@ -9,6 +9,7 @@ import {
 import { User } from '../../users/entities/user.entity';
 import { Plan } from '../../plans/entities/plan.entity';
 import { ServiceStatus } from '../../common/enums/service-status.enum';
+import { BillingCycle } from '../../common/enums/billing-cycle.enum';
 
 @Entity({ name: 'services' })
 export class Service {
@@ -33,6 +34,9 @@ export class Service {
 
     @Column({ name: 'expires_at', type: 'timestamp with time zone', nullable: true })
     expiresAt: Date | null;
+
+    @Column({ name: 'billing_cycle', type: 'enum', enum: BillingCycle, default: BillingCycle.MONTHLY })
+    billingCycle: BillingCycle;
 
     @Column({ name: 'auto_renew', default: true })
     autoRenew: boolean;

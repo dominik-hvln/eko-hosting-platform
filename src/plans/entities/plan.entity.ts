@@ -4,8 +4,8 @@ import {
     Entity,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
+    OneToMany,
 } from 'typeorm';
-import { OneToMany } from 'typeorm';
 import { Service } from '../../services/entities/service.entity';
 
 @Entity({ name: 'plans' })
@@ -17,11 +17,14 @@ export class Plan {
     name: string; // np. "Basic", "Pro", "Enterprise"
 
     @Column({ type: 'text', nullable: true })
-    description: string;
+    description: string | null;
 
     // Używamy typu decimal dla precyzji finansowej
     @Column({ type: 'decimal', precision: 10, scale: 2 })
-    price: number;
+    price: string;
+
+    @Column({ name: 'yearly_price', type: 'decimal', precision: 10, scale: 2, nullable: true })
+    yearlyPrice: string | null;
 
     // Limity zasobów (przykładowe)
     @Column({ name: 'cpu_limit' })

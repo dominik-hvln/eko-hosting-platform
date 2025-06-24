@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { BillingCycle } from '../../common/enums/billing-cycle.enum';
 
 export class CreateServiceDto {
     @IsString()
@@ -10,4 +11,16 @@ export class CreateServiceDto {
 
     @IsUUID()
     userId: string;
+
+    @IsEnum(BillingCycle)
+    @IsOptional()
+    billingCycle?: BillingCycle;
+
+    @IsDateString()
+    @IsOptional()
+    expiresAt?: Date;
+
+    @IsBoolean()
+    @IsOptional()
+    autoRenew?: boolean;
 }

@@ -5,6 +5,7 @@ import {
     IsOptional,
     IsPositive,
     IsString,
+    IsNumberString,
 } from 'class-validator';
 
 export class CreatePlanDto {
@@ -16,9 +17,13 @@ export class CreatePlanDto {
     @IsOptional()
     description?: string;
 
-    @IsNumber()
-    @IsPositive()
-    price: number;
+    @IsNumberString()
+    @IsNotEmpty()
+    price: string;
+
+    @IsNumberString()
+    @IsOptional()
+    yearlyPrice: string | null;
 
     @IsNumber()
     @IsPositive()
