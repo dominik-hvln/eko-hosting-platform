@@ -3,6 +3,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request as ExpressRequest } from 'express';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PaymentsService } from './payments.service';
+import { GetUser } from '../auth/decorators/get-user.decorator';
+import { User } from '../users/entities/user.entity';
 
 interface RequestWithRawBody extends ExpressRequest {
   rawBody: Buffer;
@@ -40,5 +42,15 @@ export class PaymentsController {
   @Post('webhook/payu')
   async handlePayuWebhook(@Headers('openpayu-signature') signature: string, @Req() req: RequestWithRawBody) {
     // Puste na razie
+  }
+
+  @Post('pay-for-request/:requestId')
+  @UseGuards(AuthGuard('jwt'))
+  createRequestPaymentSession(
+      @Param('requestId') requestId: string,
+      @GetUser() user: { userId: string }, // Używamy naszego nowego dekoratora
+  ) {
+    // Teraz obiekt 'user' na pewno nie będzie undefined
+    return this.paymentsService.createRequestPaymentSession(user.userId, requestId);
   }
 }

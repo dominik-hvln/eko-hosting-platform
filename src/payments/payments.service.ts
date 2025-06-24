@@ -16,6 +16,9 @@ import { Wallet } from '../wallet/entities/wallet.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PayUService } from './providers/payu.service';
 import { StripeService } from './providers/stripe.service';
+import { PaymentRequestsService } from '../payment-requests/payment-requests.service';
+import { PaymentRequestStatus } from '../common/enums/payment-request-status.enum';
+import { PaymentRequest } from '../payment-requests/entities/payment-request.entity';
 
 @Injectable()
 export class PaymentsService {
@@ -27,6 +30,7 @@ export class PaymentsService {
       private readonly configService: ConfigService,
       private readonly invoicesService: InvoicesService,
       private readonly servicesService: ServicesService,
+      private readonly paymentRequestsService: PaymentRequestsService,
       private readonly dataSource: DataSource,
   ) {}
 
@@ -70,6 +74,20 @@ export class PaymentsService {
     return this.stripeService.createPaymentSession(args);
   }
 
+  async createRequestPaymentSession(userId: string, requestId: string) {
+    const request = await this.paymentRequestsService.findOneForUser(requestId, userId);
+    const args = {
+      amount: request.amount,
+      currency: 'pln',
+      userEmail: request.user.email,
+      successUrl: `http://localhost:3000/dashboard/wallet?payment=success`,
+      cancelUrl: `http://localhost:3000/dashboard/wallet`,
+      paymentDescription: request.title,
+      metadata: { type: 'payment_request', requestId: request.id },
+    };
+    return this.stripeService.createPaymentSession(args);
+  }
+
   async handleStripeWebhook(signature: string, rawBody: Buffer) {
     const stripe = new Stripe(
         this.configService.get<string>('STRIPE_SECRET_KEY')!,
@@ -90,14 +108,10 @@ export class PaymentsService {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
 
-      // --- OSTATECZNY KROK DEBUGOWANIA ---
-      // Logujemy całą zawartość obiektu sesji, aby zobaczyć, co przysyła Stripe
-      this.logger.debug('--- OTRZYMANO WEBHOOK: checkout.session.completed ---');
-      this.logger.debug(JSON.stringify(session, null, 2));
-      // --- KONIEC DEBUGOWANIA ---
-
       if (session.metadata?.type === 'service_renewal') {
         await this.handleServiceRenewalPayment(session);
+      } else if (session.metadata?.type === 'payment_request') {
+        await this.handlePaymentRequestPayment(session);
       } else {
         await this.handleWalletTopUpPayment(session);
       }
@@ -176,6 +190,55 @@ export class PaymentsService {
       this.logger.log(`Created transaction ${newTransaction.id} for renewal.`);
 
       await this.invoicesService.createForTransaction(service.user, newTransaction);
+      this.logger.log(`Invoice created for transaction ${newTransaction.id}.`);
+    });
+  }
+
+  private async handlePaymentRequestPayment(session: Stripe.Checkout.Session) {
+    const requestId = session.metadata?.requestId;
+    const amountTotal = session.amount_total;
+
+    if (!requestId || !amountTotal) {
+      this.logger.error(`Webhook "payment_request" missing data. Session: ${session.id}`);
+      return;
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const request = await manager.findOne(PaymentRequest, {
+        where: { id: requestId },
+        relations: ['user', 'user.wallet'],
+      });
+
+      if (!request || request.status === PaymentRequestStatus.PAID) {
+        this.logger.warn(`Payment request ${requestId} not found or already paid.`);
+        return;
+      }
+
+      // 1. Oznaczamy żądanie jako opłacone
+      request.status = PaymentRequestStatus.PAID;
+      await manager.save(request);
+      this.logger.log(`PaymentRequest ${requestId} marked as PAID.`);
+
+      // 2. Tworzymy wpis w historii transakcji
+      const amount = amountTotal / 100;
+      const newTransaction = manager.create(Transaction, {
+        wallet: request.user.wallet,
+        amount: -amount, // Zapisujemy jako przychód/wpłatę
+        currency: 'pln',
+        status: TransactionStatus.COMPLETED,
+        type: TransactionType.PAYMENT, // Typ to ogólna "płatność"
+        provider: 'stripe',
+        providerTransactionId: session.id,
+        description: request.title, // Używamy tytułu z żądania jako opisu
+      });
+      await manager.save(newTransaction);
+      this.logger.log(`Created transaction ${newTransaction.id} for payment request.`);
+
+      // 3. Generujemy fakturę do tej transakcji
+      await this.invoicesService.createForTransaction(
+          request.user,
+          newTransaction,
+      );
       this.logger.log(`Invoice created for transaction ${newTransaction.id}.`);
     });
   }

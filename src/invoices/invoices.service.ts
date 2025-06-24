@@ -18,7 +18,8 @@
 
       async createForTransaction(user: User, transaction: Transaction): Promise<Invoice> {
         const count = await this.invoicesRepository.count({ where: { user: { id: user.id } } });
-        const invoiceNumber = `FV-PRO/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${count + 1}`;
+        const timestamp = Date.now();
+        const invoiceNumber = `FV-PRO/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${count + 1}/${timestamp}`;
         const issueDate = new Date();
         const amountInGr = Math.round(parseFloat(transaction.amount.toString()) * 100);
         const isPayment = amountInGr < 0;

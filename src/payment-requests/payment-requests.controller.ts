@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Request } from '@nestjs/common';
 import { PaymentRequestsService } from './payment-requests.service';
 import { CreatePaymentRequestDto } from './dto/create-payment-request.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -18,5 +18,10 @@ export class PaymentRequestsController {
   @UseGuards(RolesGuard)
   create(@Body() createPaymentRequestDto: CreatePaymentRequestDto) {
     return this.paymentRequestsService.createByAdmin(createPaymentRequestDto);
+  }
+
+  @Get()
+  findAllForUser(@Request() req) {
+    return this.paymentRequestsService.findAllForUser(req.user.userId);
   }
 }

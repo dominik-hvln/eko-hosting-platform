@@ -10,6 +10,7 @@ import { Transaction } from '../transactions/entities/transaction.entity';
 import { PayUService } from './providers/payu.service';
 import { InvoicesModule } from '../invoices/invoices.module';
 import { ServicesModule } from '../services/services.module';
+import { PaymentRequestsModule } from '../payment-requests/payment-requests.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ServicesModule } from '../services/services.module';
     TypeOrmModule.forFeature([Wallet, Transaction]),
     InvoicesModule,
     ServicesModule,
+    PaymentRequestsModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, StripeService, PayUService],
