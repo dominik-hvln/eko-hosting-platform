@@ -1,6 +1,6 @@
     import { Injectable, NotFoundException } from '@nestjs/common';
     import { InjectRepository } from '@nestjs/typeorm';
-    import { Repository } from 'typeorm';
+    import { Between, Repository } from 'typeorm';
     import { Invoice } from './entities/invoice.entity';
     import { User } from '../users/entities/user.entity';
     import { Transaction } from '../transactions/entities/transaction.entity';
@@ -18,8 +18,13 @@
 
       async createForTransaction(user: User, transaction: Transaction): Promise<Invoice> {
         const count = await this.invoicesRepository.count({ where: { user: { id: user.id } } });
-        const timestamp = Date.now();
-        const invoiceNumber = `FV-PRO/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${count + 1}/${timestamp}`;
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const countInMonth = await this.invoicesRepository.count({
+          where: { createdAt: Between(startOfMonth, endOfMonth) },
+        });
+        const invoiceNumber = `FV/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${countInMonth + 1}`;
         const issueDate = new Date();
         const amountInGr = Math.round(parseFloat(transaction.amount.toString()) * 100);
         const isPayment = amountInGr < 0;
@@ -64,71 +69,105 @@
       // --- POPRAWIONA METODA GENEROWANIA PDF ---
       async generatePdf(invoice: Invoice): Promise<Buffer> {
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
+
+        // Rejestracja czcionek z polskimi znakami
         const regularFontPath = path.join(process.cwd(), 'assets', 'fonts', 'Roboto-Regular.ttf');
         const boldFontPath = path.join(process.cwd(), 'assets', 'fonts', 'Roboto-Bold.ttf');
         doc.registerFont('Roboto', regularFontPath);
         doc.registerFont('Roboto-Bold', boldFontPath);
-        const formatCurrency = (amountInGr: number) => `${(amountInGr / 100).toFixed(2)} PLN`;
 
-        doc.fontSize(20).font('Roboto-Bold').text(`Faktura Pro-Forma nr: ${invoice.invoiceNumber}`, { align: 'center' });
-        doc.moveDown(2);
+        const formatCurrency = (amountInGr: number) => (amountInGr / 100).toFixed(2);
+        const formatDate = (date: Date) => new Date(date).toLocaleDateString('pl-PL');
 
-        doc.fontSize(10).font('Roboto');
-        doc.text(`Data wystawienia: ${new Date(invoice.issueDate).toLocaleDateString()}`);
-        doc.text(`Data sprzedaży: ${new Date(invoice.saleDate).toLocaleDateString()}`);
-        doc.moveDown();
+        // --- Nagłówek ---
+        const logoPath = path.join(process.cwd(), 'assets', 'logo.png');
+        if (fs.existsSync(logoPath)) {
+          doc.image(logoPath, 50, 40, { width: 50 });
+        }
+        doc.fontSize(20).font('Roboto-Bold').text(`Faktura VAT`, { align: 'center' });
+        doc.fontSize(20).font('Roboto-Bold').text(`${invoice.invoiceNumber}`, { align: 'center' });
 
+        doc.fontSize(8).font('Roboto').text(`Miejsce wystawienia: Warszawa`, 400, 50, { align: 'right' });
+        doc.text(`Data wystawienia: ${formatDate(invoice.issueDate)}`, { align: 'right' });
+        doc.text(`Data sprzedaży: ${formatDate(invoice.saleDate)}`, { align: 'right' });
+
+        // --- Dane stron ---
         const sellerX = 50;
-        const buyerX = 350;
-        const yPos = doc.y;
+        const buyerX = 320;
+        let yPos = 150;
+        doc.fontSize(10).font('Roboto-Bold');
+        doc.text('Sprzedawca:', sellerX, yPos);
+        doc.text('Nabywca:', buyerX, yPos);
+        doc.moveDown(0.5);
 
-        doc.font('Roboto-Bold').text('Sprzedawca:', sellerX, yPos);
-        doc.font('Roboto').text(invoice.seller.name, sellerX, doc.y);
-        doc.text(invoice.seller.addressLine1 || '', sellerX, doc.y);
-        doc.text(`${invoice.seller.zipCode || ''} ${invoice.seller.city || ''}`, sellerX, doc.y);
-        doc.text(`NIP: ${invoice.seller.taxId}`, sellerX, doc.y);
+        yPos = doc.y;
+        doc.font('Roboto');
+        doc.text(invoice.seller.name, sellerX);
+        doc.text(invoice.seller.addressLine1 || '');
+        doc.text(`${invoice.seller.zipCode || ''} ${invoice.seller.city || ''}`);
+        doc.text(`NIP: ${invoice.seller.taxId}`);
 
-        doc.font('Roboto-Bold').text('Nabywca:', buyerX, yPos);
-        doc.font('Roboto').text(invoice.buyer.name, buyerX, doc.y);
-        doc.text(invoice.buyer.addressLine1 || '', buyerX, doc.y);
-        doc.text(`${invoice.buyer.zipCode || ''} ${invoice.buyer.city || ''}`, buyerX, doc.y);
-        doc.text(`NIP: ${invoice.buyer.taxId || 'Brak'}`, buyerX, doc.y);
-
+        doc.text(invoice.buyer.name, buyerX);
+        doc.text(invoice.buyer.addressLine1 || '');
+        doc.text(`${invoice.buyer.zipCode || ''} ${invoice.buyer.city || ''}`);
+        doc.text(`NIP: ${invoice.buyer.taxId || 'Brak'}`);
         doc.moveDown(3);
 
+        // --- Tabela z pozycjami ---
         const tableTop = doc.y;
-        const itemX = 50;
-        const qtyX = 300;
-        const priceX = 370;
-        const totalX = 440;
+        const positions = { lp: 50, nazwa: 70, ilosc: 300, jm: 340, cenaNetto: 370, wartoscNetto: 430, vat: 490, wartoscBrutto: 520 };
+
+        const drawLine = (y: number) => doc.moveTo(50, y).lineTo(550, y).strokeColor("#cccccc").lineWidth(0.5).stroke();
 
         doc.font('Roboto-Bold');
-        doc.text('Nazwa usługi/towaru', itemX, tableTop);
-        doc.text('Ilość', qtyX, tableTop, { width: 50, align: 'right' });
-        doc.text('Cena netto', priceX, tableTop, { width: 60, align: 'right' });
-        doc.text('Wartość brutto', totalX, tableTop, { width: 90, align: 'right' });
+        doc.fontSize(8);
+        doc.text('Lp.', positions.lp, tableTop);
+        doc.text('Nazwa towaru/usługi', positions.nazwa, tableTop);
+        doc.text('Ilość', positions.ilosc, tableTop);
+        doc.text('J.m.', positions.jm, tableTop);
+        doc.text('Cena netto', positions.cenaNetto, tableTop);
+        doc.text('Wartość netto', positions.wartoscNetto, tableTop);
+        doc.text('% VAT', positions.vat, tableTop);
+        doc.text('Wartość brutto', positions.wartoscBrutto, tableTop, { align: 'right' });
+        drawLine(doc.y + 2);
 
-        const drawLine = (y) => doc.moveTo(itemX, y).lineTo(540, y).strokeColor("#aaaaaa").stroke();
-        drawLine(doc.y + 3);
-        doc.moveDown();
-
-        doc.font('Roboto');
-        invoice.items.forEach(item => {
-          const y = doc.y;
-          doc.text(item.name, itemX, y);
-          doc.text(item.quantity.toString(), qtyX, y, { width: 50, align: 'right' });
-          doc.text(formatCurrency(item.netValue), priceX, y, { width: 60, align: 'right' });
-          doc.text(formatCurrency(item.grossValue), totalX, y, { width: 90, align: 'right' });
+        doc.font('Roboto').fontSize(9);
+        invoice.items.forEach((item, index) => {
+          const y = doc.y + 5;
+          doc.text(String(index + 1), positions.lp, y);
+          doc.text(item.name, positions.nazwa, y, { width: 230 });
+          doc.text(String(item.quantity), positions.ilosc, y);
+          doc.text('szt.', positions.jm, y);
+          doc.text(formatCurrency(item.netValue), positions.cenaNetto, y);
+          doc.text(formatCurrency(item.netValue), positions.wartoscNetto, y);
+          doc.text(String(item.vatRate), positions.vat, y);
+          doc.text(formatCurrency(item.grossValue), positions.wartoscBrutto, y, { align: 'right' });
           doc.moveDown();
         });
         drawLine(doc.y);
-        doc.moveDown(2);
 
-        doc.font('Roboto');
-        doc.fontSize(10).text(`Suma netto: ${formatCurrency(invoice.totalNetValue)}`, { align: 'right' });
-        doc.text(`VAT (23%): ${formatCurrency(invoice.totalGrossValue - invoice.totalNetValue)}`, { align: 'right' });
-        doc.moveDown();
-        doc.font('Roboto-Bold').fontSize(12).text(`Do zapłaty: ${formatCurrency(invoice.totalGrossValue)}`, { align: 'right' });
+        // --- Podsumowanie ---
+        const summaryX_label = 380;
+        const summaryX_value = 450;
+        doc.moveDown(2);
+        doc.fontSize(10).font('Roboto');
+
+        yPos = doc.y;
+        doc.text('Razem netto:', summaryX_label, yPos, { align: 'left' });
+        doc.text(`${formatCurrency(invoice.totalNetValue)} PLN`, summaryX_value, yPos, { align: 'right' });
+        yPos += 15;
+        doc.text('W tym VAT (23%):', summaryX_label, yPos, { align: 'left' });
+        doc.text(`${formatCurrency(invoice.totalGrossValue - invoice.totalNetValue)} PLN`, summaryX_value, yPos, { align: 'right' });
+        yPos += 15;
+        doc.font('Roboto-Bold').fontSize(12);
+        doc.text('Do zapłaty:', summaryX_label, yPos, { align: 'left' });
+        doc.text(`${formatCurrency(invoice.totalGrossValue)} PLN`, summaryX_value, yPos, { align: 'right' });
+
+        doc.y = doc.y + 30; // Zwiększamy odstęp, aby nie nachodziło na stopkę
+        yPos = doc.y;
+        doc.font('Roboto').fontSize(10);
+        doc.text(`Forma płatności: Płatność online`, 50, yPos);
+        doc.text(`Status płatności: Opłacono`, 50, doc.y);
 
         doc.end();
 
