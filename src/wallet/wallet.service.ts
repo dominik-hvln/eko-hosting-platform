@@ -6,6 +6,7 @@ import { Transaction } from '../transactions/entities/transaction.entity';
 import { TransactionStatus } from '../common/enums/transaction-status.enum';
 import { TransactionType } from '../common/enums/transaction-type.enum';
 import { v4 as uuidv4 } from 'uuid';
+import { EkoActionHistory } from '../eko/entities/eko-action-history.entity';
 
 @Injectable()
 export class WalletService {
@@ -40,18 +41,27 @@ export class WalletService {
       const wallet = await manager.findOneBy(Wallet, { user: { id: userId } });
       if (!wallet) throw new NotFoundException('Wallet not found');
 
+      // Odejmujemy punkty i dodajemy saldo
       wallet.ekoPoints -= pointsSpent;
       wallet.balance = parseFloat(wallet.balance.toString()) + creditAmount;
       await manager.save(wallet);
 
+      const ekoAction = manager.create(EkoActionHistory, {
+        user: { id: userId },
+        actionType: 'REDEEM_FOR_CREDIT',
+        pointsChange: -pointsSpent, // Zapisujemy jako ujemną wartość
+      });
+      await manager.save(ekoAction);
+
+      // Tworzymy transakcję, aby był ślad w historii
       const transaction = manager.create(Transaction, {
         wallet: wallet,
         amount: creditAmount,
         currency: 'pln',
         status: TransactionStatus.COMPLETED,
         type: TransactionType.EKO_CREDIT,
-        provider: 'internal', // Oznaczamy jako transakcję wewnętrzną
-        providerTransactionId: `eko-${uuidv4()}`, // Generujemy unikalne ID
+        provider: 'internal',
+        providerTransactionId: `eko-${uuidv4()}`,
         description: `Wymiana ${pointsSpent} pkt EKO na środki.`,
       });
       await manager.save(transaction);
