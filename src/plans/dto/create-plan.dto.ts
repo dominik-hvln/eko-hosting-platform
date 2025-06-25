@@ -1,11 +1,13 @@
+// src/plans/dto/create-plan.dto.ts
+
 import {
     IsBoolean,
     IsNotEmpty,
-    IsNumber,
     IsOptional,
-    IsPositive,
     IsString,
     IsNumberString,
+    IsNumber,
+    IsPositive,
 } from 'class-validator';
 
 export class CreatePlanDto {
@@ -25,6 +27,7 @@ export class CreatePlanDto {
     @IsOptional()
     yearlyPrice: string | null;
 
+    // --- POPRAWKA TYPÓW I WALIDATORÓW ---
     @IsNumber()
     @IsPositive()
     cpuLimit: number;
@@ -40,8 +43,21 @@ export class CreatePlanDto {
     @IsNumber()
     @IsPositive()
     monthlyTransferLimit: number;
+    // ------------------------------------
 
     @IsBoolean()
     @IsOptional()
     isPublic?: boolean;
+
+    @IsString()
+    @IsOptional()
+    stripeProductId?: string;
+
+    @IsString()
+    @IsOptional()
+    stripeMonthlyPriceId?: string;
+
+    @IsString()
+    @IsOptional()
+    stripeYearlyPriceId?: string;
 }
