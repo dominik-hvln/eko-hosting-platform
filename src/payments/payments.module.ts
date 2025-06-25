@@ -11,12 +11,14 @@ import { PayUService } from './providers/payu.service';
 import { InvoicesModule } from '../invoices/invoices.module';
 import { ServicesModule } from '../services/services.module';
 import { PaymentRequestsModule } from '../payment-requests/payment-requests.module';
+import { User } from '../users/entities/user.entity';
+import { Service } from '../services/entities/service.entity';
 
 @Module({
   imports: [
     ConfigModule,
     AuthModule,
-    TypeOrmModule.forFeature([Wallet, Transaction]),
+    TypeOrmModule.forFeature([Wallet, Transaction, User, Service]),
     InvoicesModule,
     ServicesModule,
     PaymentRequestsModule,

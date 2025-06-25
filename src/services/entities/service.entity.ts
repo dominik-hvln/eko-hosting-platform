@@ -26,6 +26,9 @@ export class Service {
     })
     status: ServiceStatus;
 
+    @Column({ name: 'stripe_subscription_id', type: 'varchar', nullable: true, unique: true })
+    stripeSubscriptionId: string | null;
+
     @ManyToOne(() => User, (user) => user.services)
     user: User;
 

@@ -26,6 +26,8 @@ export class PaymentsService {
   private readonly frontendUrl: string;
 
   constructor(
+      @InjectRepository(User) private readonly usersRepository: Repository<User>, // Dodajemy repozytorium User
+      @InjectRepository(Service) private readonly servicesRepository: Repository<Service>,
       private readonly stripeService: StripeService,
       private readonly payuService: PayUService,
       private readonly configService: ConfigService,
@@ -33,7 +35,10 @@ export class PaymentsService {
       private readonly servicesService: ServicesService,
       private readonly paymentRequestsService: PaymentRequestsService,
       private readonly dataSource: DataSource,
-  ) {}
+  ) {
+    // POPRAWKA 1: Dodajemy '!' aby zapewnić, że zmienna istnieje, lub fallback.
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL')!;
+  }
 
   async createSubscription(userId: string, serviceId: string) {
     this.logger.log(`Attempting to create subscription for service ${serviceId} for user ${userId}`);
@@ -115,34 +120,156 @@ export class PaymentsService {
   }
 
   async handleStripeWebhook(signature: string, rawBody: Buffer) {
-    const stripe = new Stripe(
-        this.configService.get<string>('STRIPE_SECRET_KEY')!,
-        { apiVersion: '2025-05-28.basil' },
-    );
+    const stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY')!, { apiVersion: '2025-05-28.basil' });
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(
-          rawBody,
-          signature,
-          this.configService.get<string>('STRIPE_WEBHOOK_SECRET')!,
-      );
+      event = stripe.webhooks.constructEvent(rawBody, signature, this.configService.get<string>('STRIPE_WEBHOOK_SECRET')!);
     } catch (err) {
       throw new BadRequestException(`Webhook Error: ${err.message}`);
     }
 
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session;
+    this.logger.log(`Received Stripe event: ${event.type}`);
 
-      if (session.metadata?.type === 'service_renewal') {
-        await this.handleServiceRenewalPayment(session);
-      } else if (session.metadata?.type === 'payment_request') {
-        await this.handlePaymentRequestPayment(session);
-      } else {
-        await this.handleWalletTopUpPayment(session);
-      }
+    // Używamy switcha do obsługi różnych typów zdarzeń
+    switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object as Stripe.Checkout.Session;
+        // Sprawdzamy metadane, aby wywołać odpowiednią logikę
+        if (session.metadata?.type === 'service_subscription') {
+          await this.handleSubscriptionCreation(session);
+        } else if (session.metadata?.type === 'service_renewal') {
+          await this.handleServiceRenewalPayment(session);
+        } else if (session.metadata?.type === 'payment_request') {
+          await this.handlePaymentRequestPayment(session);
+        } else {
+          await this.handleWalletTopUpPayment(session);
+        }
+        break;
+
+      case 'invoice.payment_succeeded':
+        // To zdarzenie jest kluczowe dla automatycznych odnowień subskrypcji
+        const invoice = event.data.object as Stripe.Invoice;
+        // Ignorujemy pierwszą fakturę subskrypcji, bo jest obsługiwana przez checkout.session.completed
+        if (invoice.billing_reason === 'subscription_cycle') {
+          await this.handleSubscriptionRenewal(invoice);
+        }
+        break;
+
+      case 'customer.subscription.deleted':
+        const subscription = event.data.object as Stripe.Subscription;
+        await this.handleSubscriptionCancellation(subscription);
+        break;
+
+      default:
+        this.logger.log(`Unhandled event type: ${event.type}`);
     }
+
     return { received: true };
+  }
+
+  private async handleSubscriptionCreation(session: Stripe.Checkout.Session) {
+    this.logger.log(`Handling new subscription from session: ${session.id}`);
+    if (!session.metadata) {
+      this.logger.error(`Webhook "checkout.session.completed" is missing metadata. Session: ${session.id}`);
+      return;
+    }
+    const { userId, serviceId } = session.metadata;
+    const stripeSubscriptionId = session.subscription?.toString();
+    const stripeCustomerId = session.customer?.toString();
+
+    if (!userId || !serviceId || !stripeSubscriptionId || !stripeCustomerId) {
+      this.logger.error(`Webhook "checkout.session.completed" for subscription is missing metadata. Session: ${session.id}`);
+      return;
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const user = await manager.findOneBy(User, { id: userId });
+      const service = await manager.findOneBy(Service, { id: serviceId });
+
+      if (!user || !service) {
+        this.logger.error(`User (${userId}) or Service (${serviceId}) not found for subscription creation.`);
+        return;
+      }
+
+      // Zapisujemy ID klienta i subskrypcji
+      user.stripeCustomerId = stripeCustomerId;
+      service.stripeSubscriptionId = stripeSubscriptionId;
+      // Wyłączamy auto-odnawianie z portfela, bo subskrypcja przejmuje kontrolę
+      service.autoRenew = false;
+
+      // Ustawiamy datę wygaśnięcia na miesiąc/rok do przodu
+      const newExpiryDate = new Date();
+      if (service.billingCycle === BillingCycle.YEARLY) {
+        newExpiryDate.setFullYear(newExpiryDate.getFullYear() + 1);
+      } else {
+        newExpiryDate.setMonth(newExpiryDate.getMonth() + 1);
+      }
+      service.expiresAt = newExpiryDate;
+
+      await manager.save(user);
+      await manager.save(service);
+      this.logger.log(`Subscription ${stripeSubscriptionId} successfully linked to service ${serviceId}.`);
+    });
+  }
+
+  private async handleSubscriptionRenewal(invoice: Stripe.Invoice) {
+    const stripeSubscriptionId = invoice.lines.data[0]?.subscription;
+    if (typeof stripeSubscriptionId !== 'string') {
+      this.logger.error(`Could not extract a valid subscription ID string from invoice: ${invoice.id}`);
+      return;
+    }
+
+    this.logger.log(`Handling subscription renewal for subscription: ${stripeSubscriptionId}`);
+
+    return this.dataSource.transaction(async (manager) => {
+      const service = await manager.findOne(Service, {
+        where: { stripeSubscriptionId },
+        relations: ['user', 'user.wallet'],
+      });
+
+      if (!service) {
+        this.logger.warn(`Received renewal for unknown subscription: ${stripeSubscriptionId}`);
+        return;
+      }
+
+      // Przedłużamy usługę
+      const newExpiryDate = new Date(service.expiresAt || new Date());
+      if (service.billingCycle === BillingCycle.YEARLY) {
+        newExpiryDate.setFullYear(newExpiryDate.getFullYear() + 1);
+      } else {
+        newExpiryDate.setMonth(newExpiryDate.getMonth() + 1);
+      }
+      service.expiresAt = newExpiryDate;
+      await manager.save(service);
+      this.logger.log(`Service ${service.id} renewed via subscription until ${newExpiryDate.toISOString()}`);
+
+      // Tworzymy transakcję i fakturę
+      const amount = invoice.amount_paid / 100;
+      const newTransaction = manager.create(Transaction, {
+        wallet: service.user.wallet,
+        amount: -amount,
+        currency: 'pln',
+        status: TransactionStatus.COMPLETED,
+        type: TransactionType.PAYMENT,
+        provider: 'stripe',
+        providerTransactionId: invoice.id,
+        description: `Odnowienie subskrypcji: ${service.name}`,
+      });
+      await manager.save(newTransaction);
+      await this.invoicesService.createForTransaction(service.user, newTransaction);
+    });
+  }
+
+  private async handleSubscriptionCancellation(subscription: Stripe.Subscription) {
+    this.logger.log(`Handling subscription cancellation for: ${subscription.id}`);
+    const service = await this.servicesRepository.findOneBy({ stripeSubscriptionId: subscription.id });
+
+    if (service) {
+      // Usługa pozostaje aktywna do końca opłaconego okresu.
+      // Możemy tu dodać logikę powiadomień dla admina lub klienta.
+      this.logger.log(`Subscription for service ${service.id} was cancelled. It will expire on ${service.expiresAt}.`);
+    }
   }
 
   private async handleWalletTopUpPayment(session: Stripe.Checkout.Session) {

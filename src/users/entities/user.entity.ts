@@ -33,6 +33,9 @@ export class User {
     @Column({ type: 'enum', enum: Role, default: Role.USER })
     role: Role;
 
+    @Column({ name: 'stripe_customer_id', type: 'varchar', nullable: true, unique: true })
+    stripeCustomerId: string | null;
+
     @Column({ name: 'is_active', default: true })
     isActive: boolean;
 
