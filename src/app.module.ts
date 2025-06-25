@@ -22,6 +22,7 @@ import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentRequestsModule } from './payment-requests/payment-requests.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { ServersModule } from './admin/servers/servers.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { APP_GUARD } from '@nestjs/core';
     MigrationsModule,
     InvoicesModule,
     PaymentRequestsModule,
+    ServersModule,
   ],
   controllers: [AppController],
   providers: [
