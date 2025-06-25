@@ -41,8 +41,8 @@ export class PaymentsService {
       amount: createPaymentDto.amount * 100,
       currency: 'pln',
       userEmail: user.email,
-      successUrl: 'http://localhost:3000/payment/success',
-      cancelUrl: 'http://localhost:3000/payment/cancel',
+      successUrl: 'https://localhost:3000/payment/success',
+      cancelUrl: 'https://localhost:3000/payment/cancel',
       paymentDescription: `Doładowanie portfela EKO-HOSTING za ${amountInPLN} PLN`, // NOWY OPIS
       metadata: { type: 'wallet_top_up' },
     };
@@ -72,8 +72,8 @@ export class PaymentsService {
       amount: amountInGr,
       currency: 'pln',
       userEmail: service.user.email,
-      successUrl: `http://localhost:3000/dashboard/services/${serviceId}?payment=success`,
-      cancelUrl: `http://localhost:3000/dashboard/services/${serviceId}`,
+      successUrl: `https://localhost:3000/dashboard/services/${serviceId}?payment=success`,
+      cancelUrl: `https://localhost:3000/dashboard/services/${serviceId}`,
       paymentDescription: `Odnowienie usługi: ${service.name} (${
           isYearly ? 'rocznie' : 'miesięcznie'
       })`,
@@ -88,8 +88,8 @@ export class PaymentsService {
       amount: request.amount,
       currency: 'pln',
       userEmail: request.user.email,
-      successUrl: `http://localhost:3000/dashboard/wallet?payment=success`,
-      cancelUrl: `http://localhost:3000/dashboard/wallet`,
+      successUrl: `https://localhost:3000/dashboard/wallet?payment=success`,
+      cancelUrl: `https://localhost:3000/dashboard/wallet`,
       paymentDescription: request.title,
       metadata: { type: 'payment_request', requestId: request.id },
     };

@@ -15,12 +15,16 @@ export class RolesGuard implements CanActivate {
         ]);
 
         // Jeśli endpoint nie wymaga żadnych specyficznych ról, wpuszczamy każdego
-        if (!requiredRoles) {
+        if (!requiredRoles || requiredRoles.length === 0) {
             return true;
         }
 
         // Pobieramy obiekt użytkownika z żądania (dołączony przez JwtAuthGuard)
         const { user } = context.switchToHttp().getRequest();
+
+        if (!user) {
+            return false;
+        }
 
         // Sprawdzamy, czy rola użytkownika znajduje się w tablicy wymaganych ról
         return requiredRoles.some((role) => user.role === role);

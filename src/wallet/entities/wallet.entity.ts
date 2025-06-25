@@ -19,8 +19,11 @@ export class Wallet {
     @Column({ type: 'decimal', precision: 12, scale: 2, default: 0.0 })
     balance: number;
 
-    @Column({ name: 'eko_points', type: 'integer', default: 0 })
+    @Column({ name: 'eko_points', type: 'decimal', precision: 14, scale: 2, default: 0 })
     ekoPoints: number;
+
+    @Column({ name: 'lifetime_eko_points', type: 'decimal', precision: 14, scale: 2, default: 0 })
+    lifetimeEkoPoints: number;
 
     @Column({ name: 'eko_discount_percentage', type: 'integer', default: 0 })
     ekoDiscountPercentage: number;

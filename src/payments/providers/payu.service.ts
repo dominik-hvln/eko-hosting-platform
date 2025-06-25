@@ -50,7 +50,7 @@ export class PayUService implements PaymentProvider {
 
         // PayU wymaga bardzo szczegółowego obiektu zamówienia
         const orderData = {
-            notifyUrl: 'http://localhost:3000/payments/webhook/payu', // Nasz przyszły webhook
+            notifyUrl: 'https://localhost:3000/payments/webhook/payu', // Nasz przyszły webhook
             continueUrl: args.successUrl, // Adres po udanej płatności
             customerIp: '127.0.0.1', // W produkcji tu będzie IP klienta
             merchantPosId: this.posId,

@@ -6,12 +6,15 @@ import { Repository } from 'typeorm';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { User } from '../users/entities/user.entity';
 import { BillingCycle } from '../common/enums/billing-cycle.enum';
+import { EkoService } from '../eko/eko.service';
+import { EkoActionType } from '../eko/entities/eko-action-history.entity';
 
 @Injectable()
 export class ServicesService {
   constructor(
       @InjectRepository(Service)
       private readonly servicesRepository: Repository<Service>,
+      private readonly ekoService: EkoService,
   ) {}
 
   async create(createServiceDto: CreateServiceDto): Promise<Service> {
@@ -56,6 +59,9 @@ export class ServicesService {
   async toggleAutoRenewForUser(id: string, userId: string): Promise<Service> {
     const service = await this.findOneForUser(id, userId);
     service.autoRenew = !service.autoRenew;
+    if (service.autoRenew) {
+      this.ekoService.grantPointsForAction(userId, EkoActionType.AUTO_RENEWAL_REWARD);
+    }
     return this.servicesRepository.save(service);
   }
 

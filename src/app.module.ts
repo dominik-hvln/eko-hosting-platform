@@ -20,6 +20,8 @@ import { EncryptionModule } from './common/encryption/encryption.module';
 import { MigrationsModule } from './migrations/migrations.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentRequestsModule } from './payment-requests/payment-requests.module';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -27,6 +29,13 @@ import { PaymentRequestsModule } from './payment-requests/payment-requests.modul
       isGlobal: true,
       envFilePath: '.env',
     }),
+    // Konfiguracja Throttlera - ochrona przed atakami brute-force
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 1 minuta w milisekundach
+        limit: 60, // 60 zapytań na minutę z jednego IP
+      },
+    ]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -38,7 +47,6 @@ import { PaymentRequestsModule } from './payment-requests/payment-requests.modul
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
         autoLoadEntities: true,
-
         synchronize: true,
       }),
     }),
@@ -61,6 +69,12 @@ import { PaymentRequestsModule } from './payment-requests/payment-requests.modul
     PaymentRequestsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

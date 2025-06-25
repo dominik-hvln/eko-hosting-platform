@@ -4,6 +4,7 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+COPY ./ssl ./ssl
 RUN npm run build
 
 # ETAP 2: Tworzenie finalnego, lekkiego obrazu
@@ -13,9 +14,8 @@ WORKDIR /usr/src/app
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/package.json ./package.json
-# ----> DODAJEMY TĘ LINIĘ <----
-# Kopiujemy pliki konfiguracyjne TypeScripta
 COPY --from=builder /usr/src/app/tsconfig*.json ./
+COPY --from=builder /usr/src/app/ssl ./ssl
 COPY assets ./assets
 
 EXPOSE 3000

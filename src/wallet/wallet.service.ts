@@ -1,3 +1,5 @@
+// src/wallet/wallet.service.ts
+
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Wallet } from './entities/wallet.entity';
@@ -6,14 +8,13 @@ import { Transaction } from '../transactions/entities/transaction.entity';
 import { TransactionStatus } from '../common/enums/transaction-status.enum';
 import { TransactionType } from '../common/enums/transaction-type.enum';
 import { v4 as uuidv4 } from 'uuid';
-import { EkoActionHistory } from '../eko/entities/eko-action-history.entity';
+import { EkoActionHistory, EkoActionType } from '../eko/entities/eko-action-history.entity';
 
 @Injectable()
 export class WalletService {
   constructor(
       @InjectRepository(Wallet)
       private readonly walletsRepository: Repository<Wallet>,
-      // Dodajemy wstrzyknięcie DataSource, aby móc używać transakcji
       private readonly dataSource: DataSource,
   ) {}
 
@@ -41,19 +42,20 @@ export class WalletService {
       const wallet = await manager.findOneBy(Wallet, { user: { id: userId } });
       if (!wallet) throw new NotFoundException('Wallet not found');
 
-      // Odejmujemy punkty i dodajemy saldo
-      wallet.ekoPoints -= pointsSpent;
+      wallet.ekoPoints = parseFloat(wallet.ekoPoints.toString()) - pointsSpent;
       wallet.balance = parseFloat(wallet.balance.toString()) + creditAmount;
       await manager.save(wallet);
 
+      // --- POPRAWKA ---
+      // Zapisujemy historię używając nowej, pojedynczej kolumny 'points'
       const ekoAction = manager.create(EkoActionHistory, {
         user: { id: userId },
-        actionType: 'REDEEM_FOR_CREDIT',
-        pointsChange: -pointsSpent, // Zapisujemy jako ujemną wartość
+        actionType: EkoActionType.REDEEM_FOR_CREDIT,
+        points: -pointsSpent, // Wartość ujemna oznacza wydane punkty
       });
       await manager.save(ekoAction);
+      // ----------------
 
-      // Tworzymy transakcję, aby był ślad w historii
       const transaction = manager.create(Transaction, {
         wallet: wallet,
         amount: creditAmount,
@@ -67,5 +69,12 @@ export class WalletService {
       await manager.save(transaction);
       return { message: 'Punkty pomyślnie wymienione na środki.' };
     });
+  }
+
+  async addEkoPoints(userId: string, pointsToAdd: number) {
+    const wallet = await this.findOneByUserId(userId);
+    wallet.ekoPoints = parseFloat(wallet.ekoPoints.toString()) + pointsToAdd;
+    wallet.lifetimeEkoPoints = parseFloat(wallet.lifetimeEkoPoints.toString()) + pointsToAdd;
+    return this.walletsRepository.save(wallet);
   }
 }
