@@ -14,6 +14,15 @@ interface RequestWithRawBody extends ExpressRequest {
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  @Post('create-subscription/:serviceId')
+  @UseGuards(AuthGuard('jwt'))
+  createSubscription(
+      @Param('serviceId') serviceId: string,
+      @GetUser() user: { userId: string },
+  ) {
+    return this.paymentsService.createSubscription(user.userId, serviceId);
+  }
+
   @UseGuards(AuthGuard('jwt'))
   @Post('top-up/stripe')
   createStripeTopUpSession(@Body() createPaymentDto: CreatePaymentDto, @Request() req) {

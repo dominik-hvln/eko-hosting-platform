@@ -1,13 +1,16 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import Stripe from 'stripe';
 import { DataSource, Repository } from 'typeorm';
-import { Role } from '../common/enums/role.enum';
+import { BillingCycle } from '../common/enums/billing-cycle.enum';
+import { PaymentRequestStatus } from '../common/enums/payment-request-status.enum';
 import { ServiceStatus } from '../common/enums/service-status.enum';
 import { TransactionStatus } from '../common/enums/transaction-status.enum';
 import { TransactionType } from '../common/enums/transaction-type.enum';
 import { InvoicesService } from '../invoices/invoices.service';
+import { PaymentRequest } from '../payment-requests/entities/payment-request.entity';
+import { PaymentRequestsService } from '../payment-requests/payment-requests.service';
 import { Service } from '../services/entities/service.entity';
 import { ServicesService } from '../services/services.service';
 import { Transaction } from '../transactions/entities/transaction.entity';
@@ -16,14 +19,11 @@ import { Wallet } from '../wallet/entities/wallet.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PayUService } from './providers/payu.service';
 import { StripeService } from './providers/stripe.service';
-import { PaymentRequestsService } from '../payment-requests/payment-requests.service';
-import { PaymentRequestStatus } from '../common/enums/payment-request-status.enum';
-import { PaymentRequest } from '../payment-requests/entities/payment-request.entity';
-import { BillingCycle } from '../common/enums/billing-cycle.enum';
 
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
+  private readonly frontendUrl: string;
 
   constructor(
       private readonly stripeService: StripeService,
@@ -35,16 +35,43 @@ export class PaymentsService {
       private readonly dataSource: DataSource,
   ) {}
 
+  async createSubscription(userId: string, serviceId: string) {
+    this.logger.log(`Attempting to create subscription for service ${serviceId} for user ${userId}`);
+    const service = await this.servicesService.findOneForUser(serviceId, userId);
+
+    const isYearly = service.billingCycle === BillingCycle.YEARLY;
+    const priceId = isYearly ? service.plan.stripeYearlyPriceId : service.plan.stripeMonthlyPriceId;
+
+    if (!priceId) {
+      this.logger.error(`Stripe Price ID for service ${serviceId} and billing cycle ${service.billingCycle} is not defined.`);
+      throw new BadRequestException(`Płatność subskrypcyjna dla tego planu i cyklu rozliczeniowego nie jest skonfigurowana.`);
+    }
+
+    const args = {
+      priceId: priceId,
+      userEmail: service.user.email,
+      successUrl: `${this.frontendUrl}/dashboard/services/${serviceId}?subscription=success`,
+      cancelUrl: `${this.frontendUrl}/dashboard/services/${serviceId}`,
+      metadata: {
+        type: 'service_subscription',
+        serviceId: service.id,
+        userId: userId,
+      },
+    };
+
+    return this.stripeService.createSubscriptionSession(args);
+  }
+
   async createTopUpSession(user: Omit<User, 'password'>, createPaymentDto: CreatePaymentDto, provider: 'stripe' | 'payu') {
     const amountInPLN = createPaymentDto.amount.toFixed(2);
     const args = {
       amount: createPaymentDto.amount * 100,
       currency: 'pln',
       userEmail: user.email,
-      successUrl: 'https://localhost:3000/payment/success',
-      cancelUrl: 'https://localhost:3000/payment/cancel',
-      paymentDescription: `Doładowanie portfela EKO-HOSTING za ${amountInPLN} PLN`, // NOWY OPIS
-      metadata: { type: 'wallet_top_up' },
+      successUrl: `${this.frontendUrl}/payment/success`, // Użycie zmiennej
+      cancelUrl: `${this.frontendUrl}/payment/cancel`,   // Użycie zmiennej
+      paymentDescription: `Doładowanie portfela EKO-HOSTING za ${amountInPLN} PLN`,
+      metadata: { type: 'wallet_top_up', userId: user.id },
     };
     if (provider === 'stripe') return this.stripeService.createPaymentSession(args);
     if (provider === 'payu') return this.payuService.createPaymentSession(args);
@@ -53,31 +80,22 @@ export class PaymentsService {
 
   async createServiceRenewalSession(userId: string, serviceId: string) {
     const service = await this.servicesService.findOneForUser(serviceId, userId);
-
     const isYearly = service.billingCycle === BillingCycle.YEARLY;
     const price = isYearly ? service.plan.yearlyPrice : service.plan.price;
 
-    // --- OSTATECZNA POPRAWKA TUTAJ ---
     if (price === null || price === undefined) {
-      throw new BadRequestException(
-          `Cena dla cyklu rozliczeniowego "${isYearly ? 'rocznego' : 'miesięcznego'}" w planie "${
-              service.plan.name
-          }" nie jest zdefiniowana.`,
-      );
+      throw new BadRequestException(`Cena dla cyklu rozliczeniowego "${isYearly ? 'rocznego' : 'miesięcznego'}" w planie "${service.plan.name}" nie jest zdefiniowana.`);
     }
 
     const amountInGr = Math.round(parseFloat(price) * 100);
-
     const args = {
       amount: amountInGr,
       currency: 'pln',
       userEmail: service.user.email,
-      successUrl: `https://localhost:3000/dashboard/services/${serviceId}?payment=success`,
-      cancelUrl: `https://localhost:3000/dashboard/services/${serviceId}`,
-      paymentDescription: `Odnowienie usługi: ${service.name} (${
-          isYearly ? 'rocznie' : 'miesięcznie'
-      })`,
-      metadata: { type: 'service_renewal', serviceId: service.id },
+      successUrl: `${this.frontendUrl}/dashboard/services/${serviceId}?payment=success`, // Użycie zmiennej
+      cancelUrl: `${this.frontendUrl}/dashboard/services/${serviceId}`,                     // Użycie zmiennej
+      paymentDescription: `Odnowienie usługi: ${service.name} (${isYearly ? 'rocznie' : 'miesięcznie'})`,
+      metadata: { type: 'service_renewal', serviceId: service.id, userId: userId },
     };
     return this.stripeService.createPaymentSession(args);
   }
@@ -88,8 +106,8 @@ export class PaymentsService {
       amount: request.amount,
       currency: 'pln',
       userEmail: request.user.email,
-      successUrl: `https://localhost:3000/dashboard/wallet?payment=success`,
-      cancelUrl: `https://localhost:3000/dashboard/wallet`,
+      successUrl: `${this.frontendUrl}/dashboard/wallet?payment=success`, // Użycie zmiennej
+      cancelUrl: `${this.frontendUrl}/dashboard/wallet`,                   // Użycie zmiennej
       paymentDescription: request.title,
       metadata: { type: 'payment_request', requestId: request.id },
     };
