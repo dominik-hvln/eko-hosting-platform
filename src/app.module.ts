@@ -23,6 +23,8 @@ import { PaymentRequestsModule } from './payment-requests/payment-requests.modul
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ServersModule } from './admin/servers/servers.module';
+import { BullModule } from '@nestjs/bullmq'; // <-- NOWY IMPORT
+import { ProvisioningModule } from './provisioning/provisioning.module';
 
 @Module({
   imports: [
@@ -37,6 +39,16 @@ import { ServersModule } from './admin/servers/servers.module';
         limit: 60, // 60 zapytań na minutę z jednego IP
       },
     ]),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('REDIS_HOST'),
+          port: configService.get<number>('REDIS_PORT'),
+        },
+      }),
+    }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -69,6 +81,7 @@ import { ServersModule } from './admin/servers/servers.module';
     InvoicesModule,
     PaymentRequestsModule,
     ServersModule,
+    ProvisioningModule,
   ],
   controllers: [AppController],
   providers: [

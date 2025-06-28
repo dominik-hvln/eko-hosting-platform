@@ -1,3 +1,5 @@
+// src/services/services.controller.ts
+
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, HttpCode } from '@nestjs/common';
 import { ServicesService } from './services.service';
 import { CreateServiceDto } from './dto/create-service.dto';
@@ -33,7 +35,6 @@ export class ServicesController {
   @Post()
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)
-  // Metoda jest teraz znacznie prostsza - tylko przekazuje DTO
   create(@Body() createServiceDto: CreateServiceDto) {
     return this.servicesService.create(createServiceDto);
   }
@@ -49,7 +50,7 @@ export class ServicesController {
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)
   findOne(@Param('id') id: string) {
-    return this.servicesService.findOne(id); // Poprawnie wywołuje findOne z jednym argumentem
+    return this.servicesService.findOne(id);
   }
 
   @Patch(':id')
@@ -65,5 +66,12 @@ export class ServicesController {
   @HttpCode(204)
   remove(@Param('id') id: string) {
     return this.servicesService.remove(id);
+  }
+
+  @Post(':id/provision-test')
+  @Roles(Role.ADMIN)
+  @UseGuards(RolesGuard)
+  testQueue(@Param('id') id: string) {
+    return this.servicesService.queueProvisioningForService(id);
   }
 }

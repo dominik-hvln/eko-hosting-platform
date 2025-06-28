@@ -19,6 +19,8 @@ import { Wallet } from '../wallet/entities/wallet.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PayUService } from './providers/payu.service';
 import { StripeService } from './providers/stripe.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class PaymentsService {
@@ -26,8 +28,9 @@ export class PaymentsService {
   private readonly frontendUrl: string;
 
   constructor(
-      @InjectRepository(User) private readonly usersRepository: Repository<User>, // Dodajemy repozytorium User
+      @InjectRepository(User) private readonly usersRepository: Repository<User>,
       @InjectRepository(Service) private readonly servicesRepository: Repository<Service>,
+      @InjectQueue('provisioning') private readonly provisioningQueue: Queue,
       private readonly stripeService: StripeService,
       private readonly payuService: PayUService,
       private readonly configService: ConfigService,
@@ -48,7 +51,6 @@ export class PaymentsService {
     const priceId = isYearly ? service.plan.stripeYearlyPriceId : service.plan.stripeMonthlyPriceId;
 
     if (!priceId) {
-      this.logger.error(`Stripe Price ID for service ${serviceId} and billing cycle ${service.billingCycle} is not defined.`);
       throw new BadRequestException(`Płatność subskrypcyjna dla tego planu i cyklu rozliczeniowego nie jest skonfigurowana.`);
     }
 
@@ -63,7 +65,6 @@ export class PaymentsService {
         userId: userId,
       },
     };
-
     return this.stripeService.createSubscriptionSession(args);
   }
 
@@ -73,8 +74,8 @@ export class PaymentsService {
       amount: createPaymentDto.amount * 100,
       currency: 'pln',
       userEmail: user.email,
-      successUrl: `${this.frontendUrl}/payment/success`, // Użycie zmiennej
-      cancelUrl: `${this.frontendUrl}/payment/cancel`,   // Użycie zmiennej
+      successUrl: `${this.frontendUrl}/payment/success`,
+      cancelUrl: `${this.frontendUrl}/payment/cancel`,
       paymentDescription: `Doładowanie portfela EKO-HOSTING za ${amountInPLN} PLN`,
       metadata: { type: 'wallet_top_up', userId: user.id },
     };
@@ -97,8 +98,8 @@ export class PaymentsService {
       amount: amountInGr,
       currency: 'pln',
       userEmail: service.user.email,
-      successUrl: `${this.frontendUrl}/dashboard/services/${serviceId}?payment=success`, // Użycie zmiennej
-      cancelUrl: `${this.frontendUrl}/dashboard/services/${serviceId}`,                     // Użycie zmiennej
+      successUrl: `${this.frontendUrl}/dashboard/services/${serviceId}?payment=success`,
+      cancelUrl: `${this.frontendUrl}/dashboard/services/${serviceId}`,
       paymentDescription: `Odnowienie usługi: ${service.name} (${isYearly ? 'rocznie' : 'miesięcznie'})`,
       metadata: { type: 'service_renewal', serviceId: service.id, userId: userId },
     };
@@ -111,8 +112,8 @@ export class PaymentsService {
       amount: request.amount,
       currency: 'pln',
       userEmail: request.user.email,
-      successUrl: `${this.frontendUrl}/dashboard/wallet?payment=success`, // Użycie zmiennej
-      cancelUrl: `${this.frontendUrl}/dashboard/wallet`,                   // Użycie zmiennej
+      successUrl: `${this.frontendUrl}/dashboard/wallet?payment=success`,
+      cancelUrl: `${this.frontendUrl}/dashboard/wallet`,
       paymentDescription: request.title,
       metadata: { type: 'payment_request', requestId: request.id },
     };
@@ -210,6 +211,12 @@ export class PaymentsService {
       await manager.save(user);
       await manager.save(service);
       this.logger.log(`Subscription ${stripeSubscriptionId} successfully linked to service ${serviceId}.`);
+      // --- DODAJEMY ZADANIE DO KOLEJKI ---
+      await this.provisioningQueue.add('create-hosting-account', {
+        serviceId: service.id,
+      });
+      this.logger.log(`Job 'create-hosting-account' for service ${service.id} added to the provisioning queue.`);
+      // ---------------------------------
     });
   }
 

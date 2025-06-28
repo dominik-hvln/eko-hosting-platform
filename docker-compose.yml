@@ -12,6 +12,7 @@ services:
     # Ta linia gwarantuje, że serwis bazy danych uruchomi się PRZED naszą aplikacją
     depends_on:
       - db
+      - redis
 
   # Nowy serwis bazy danych PostgreSQL
   db:
@@ -30,6 +31,16 @@ services:
       # Ta linia gwarantuje, że dane w bazie przetrwają restart kontenera
       - postgres_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine  # Używamy lekkiego obrazu Redis
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379" # Udostępniamy port na zewnątrz (opcjonalne, ale przydatne do debugowania)
+    volumes:
+      - redis_data:/data # Zapewnia trwałość danych Redisa
+
 # Definiujemy nazwany wolumen, aby Docker nim zarządzał
 volumes:
   postgres_data:
+  redis_data:

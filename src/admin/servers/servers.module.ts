@@ -10,9 +10,10 @@ import { EncryptionModule } from '../../common/encryption/encryption.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Server]),
-    EncryptionModule, // Importujemy, aby serwis mógł szyfrować klucze
+    EncryptionModule,
   ],
   controllers: [ServersController],
   providers: [ServersService],
+  exports: [ServersService], // Eksportujemy serwis
 })
 export class ServersModule {}

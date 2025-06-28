@@ -15,6 +15,11 @@ import { Role } from '../../common/enums/role.enum';
 export class ServersController {
     constructor(private readonly serversService: ServersService) {}
 
+    @Post(':id/test-connection')
+    testConnection(@Param('id') id: string) {
+        return this.serversService.testConnection(id);
+    }
+
     @Post()
     create(@Body() createServerDto: CreateServerDto) {
         return this.serversService.create(createServerDto);

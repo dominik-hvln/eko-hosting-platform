@@ -10,6 +10,7 @@ import { User } from '../../users/entities/user.entity';
 import { Plan } from '../../plans/entities/plan.entity';
 import { ServiceStatus } from '../../common/enums/service-status.enum';
 import { BillingCycle } from '../../common/enums/billing-cycle.enum';
+import { Server } from '../../admin/servers/entities/server.entity';
 
 @Entity({ name: 'services' })
 export class Service {
@@ -43,6 +44,12 @@ export class Service {
 
     @Column({ name: 'auto_renew', default: true })
     autoRenew: boolean;
+
+    @ManyToOne(() => Server, { nullable: true, eager: true }) // eager: true - zawsze dołączaj dane serwera
+    provisionedOnServer: Server | null;
+
+    @Column({ name: 'system_user', type: 'varchar', nullable: true })
+    systemUser: string | null;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;

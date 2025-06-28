@@ -1,3 +1,5 @@
+// src/dashboard/dashboard.service.ts
+
 import { Injectable } from '@nestjs/common';
 import { WalletService } from '../wallet/wallet.service';
 import { ServicesService } from '../services/services.service';
@@ -14,7 +16,7 @@ export class DashboardService {
   async getSummary(userId: string) {
     const [wallet, services, user] = await Promise.all([
       this.walletService.findOneByUserId(userId),
-      this.servicesService.findAllForUser(userId),
+      this.servicesService.findAllForUser(userId), // Przekazujemy string, a nie obiekt User
       this.usersService.findOne(userId),
     ]);
 

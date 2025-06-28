@@ -1,14 +1,8 @@
+// src/users/entities/user.entity.ts
+
 import { Exclude } from 'class-transformer';
 import { Role } from '../../common/enums/role.enum';
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    UpdateDateColumn,
-    OneToMany,
-    OneToOne,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, OneToOne, ManyToOne } from 'typeorm';
 import { Service } from '../../services/entities/service.entity';
 import { Wallet } from '../../wallet/entities/wallet.entity';
 import { Ticket } from '../../tickets/entities/ticket.entity';
@@ -18,16 +12,16 @@ import { Invoice } from '../../invoices/entities/invoice.entity';
 import { PaymentRequest } from '../../payment-requests/entities/payment-request.entity';
 import { EkoLevel } from '../../common/enums/eko-level.enum';
 
-@Entity({ name: 'users' }) // Mówi TypeORM, że ta klasa to encja mapowana na tabelę 'users'
+@Entity({ name: 'users' })
 export class User {
-    @PrimaryGeneratedColumn('uuid') // Klucz główny, automatycznie generowany jako UUID
+    @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ unique: true }) // Kolumna z adresem email, musi być unikalny
+    @Column({ unique: true })
     email: string;
 
     @Exclude()
-    @Column() // Kolumna z hasłem (będziemy je hashować przed zapisem)
+    @Column()
     password: string;
 
     @Column({ type: 'enum', enum: Role, default: Role.USER })
@@ -38,6 +32,14 @@ export class User {
 
     @Column({ name: 'is_active', default: true })
     isActive: boolean;
+
+    // --- KLUCZOWA POPRAWKA - DODAJEMY BRAKUJĄCE RELACJE IAM ---
+    @ManyToOne(() => User, (user) => user.subaccounts, { nullable: true, onDelete: 'SET NULL' })
+    parent: User | null;
+
+    @OneToMany(() => User, (user) => user.parent)
+    subaccounts: User[];
+    // --------------------------------------------------------
 
     @Column({ name: 'first_name', type: 'varchar', length: 100, nullable: true })
     firstName: string | null;
@@ -69,28 +71,24 @@ export class User {
     @Column({ name: 'eko_level', type: 'enum', enum: EkoLevel, default: EkoLevel.SEEDLING })
     ekoLevel: EkoLevel;
 
-    @CreateDateColumn() // Automatycznie ustawiana data utworzenia
+    @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 
-    @UpdateDateColumn() // Automatycznie ustawiana data ostatniej aktualizacji
+    @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
 
     @OneToMany(() => Service, (service) => service.user)
     services: Service[];
 
-    // Jeden użytkownik ma jeden portfel
     @OneToOne(() => Wallet, (wallet) => wallet.user)
     wallet: Wallet;
 
-    // Zgłoszenia stworzone przez tego użytkownika
     @OneToMany(() => Ticket, (ticket) => ticket.author)
     createdTickets: Ticket[];
 
-    // Zgłoszenia przypisane do tego użytkownika (jeśli jest pracownikiem)
     @OneToMany(() => Ticket, (ticket) => ticket.assignee)
     assignedTickets: Ticket[];
 
-    // Wiadomości napisane przez tego użytkownika
     @OneToMany(() => TicketMessage, (message) => message.author)
     ticketMessages: TicketMessage[];
 

@@ -13,6 +13,7 @@ import { ServicesModule } from '../services/services.module';
 import { PaymentRequestsModule } from '../payment-requests/payment-requests.module';
 import { User } from '../users/entities/user.entity';
 import { Service } from '../services/entities/service.entity';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -22,6 +23,9 @@ import { Service } from '../services/entities/service.entity';
     InvoicesModule,
     ServicesModule,
     PaymentRequestsModule,
+    BullModule.registerQueue({
+      name: 'provisioning',
+    }),
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, StripeService, PayUService],
