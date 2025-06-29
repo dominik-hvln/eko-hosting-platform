@@ -12,9 +12,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 @Controller('services')
 @UseGuards(AuthGuard('jwt'))
 export class ServicesController {
-  constructor(
-      private readonly servicesService: ServicesService,
-  ) {}
+  constructor(private readonly servicesService: ServicesService) {}
 
   @Get('my-services')
   findOwnServices(@Request() req) {
@@ -32,6 +30,15 @@ export class ServicesController {
   }
 
   // --- ENDPOINTY ADMINA ---
+
+  // Endpoint testowy do kolejki
+  @Post(':id/provision-test')
+  @Roles(Role.ADMIN)
+  @UseGuards(RolesGuard)
+  testQueue(@Param('id') id: string) {
+    return this.servicesService.queueProvisioningForService(id);
+  }
+
   @Post()
   @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)
@@ -66,12 +73,5 @@ export class ServicesController {
   @HttpCode(204)
   remove(@Param('id') id: string) {
     return this.servicesService.remove(id);
-  }
-
-  @Post(':id/provision-test')
-  @Roles(Role.ADMIN)
-  @UseGuards(RolesGuard)
-  testQueue(@Param('id') id: string) {
-    return this.servicesService.queueProvisioningForService(id);
   }
 }

@@ -2,7 +2,7 @@
 
 import { Exclude } from 'class-transformer';
 import { Role } from '../../common/enums/role.enum';
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, OneToOne, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, OneToOne } from 'typeorm';
 import { Service } from '../../services/entities/service.entity';
 import { Wallet } from '../../wallet/entities/wallet.entity';
 import { Ticket } from '../../tickets/entities/ticket.entity';
@@ -32,14 +32,6 @@ export class User {
 
     @Column({ name: 'is_active', default: true })
     isActive: boolean;
-
-    // --- KLUCZOWA POPRAWKA - DODAJEMY BRAKUJĄCE RELACJE IAM ---
-    @ManyToOne(() => User, (user) => user.subaccounts, { nullable: true, onDelete: 'SET NULL' })
-    parent: User | null;
-
-    @OneToMany(() => User, (user) => user.parent)
-    subaccounts: User[];
-    // --------------------------------------------------------
 
     @Column({ name: 'first_name', type: 'varchar', length: 100, nullable: true })
     firstName: string | null;

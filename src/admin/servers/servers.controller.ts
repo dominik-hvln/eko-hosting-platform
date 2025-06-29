@@ -15,11 +15,18 @@ import { Role } from '../../common/enums/role.enum';
 export class ServersController {
     constructor(private readonly serversService: ServersService) {}
 
+    // --- ENDPOINT DO PROVISIONINGU ---
+    @Post(':id/provision')
+    provisionServer(@Param('id') id: string) {
+        return this.serversService.queueServerProvisioning(id);
+    }
+
     @Post(':id/test-connection')
     testConnection(@Param('id') id: string) {
         return this.serversService.testConnection(id);
     }
 
+    // --- STANDARDOWE ENDPOINTY CRUD ---
     @Post()
     create(@Body() createServerDto: CreateServerDto) {
         return this.serversService.create(createServerDto);

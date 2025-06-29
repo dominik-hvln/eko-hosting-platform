@@ -6,13 +6,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Service } from './entities/service.entity';
 import { Repository } from 'typeorm';
 import { UpdateServiceDto } from './dto/update-service.dto';
-import { User } from '../users/entities/user.entity';
 import { BillingCycle } from '../common/enums/billing-cycle.enum';
 import { EkoService } from '../eko/eko.service';
 import { EkoActionType } from '../eko/entities/eko-action-history.entity';
 import { Plan } from '../plans/entities/plan.entity';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class ServicesService {
@@ -21,8 +21,6 @@ export class ServicesService {
   constructor(
       @InjectRepository(Service)
       private readonly servicesRepository: Repository<Service>,
-      @InjectRepository(User)
-      private readonly usersRepository: Repository<User>,
       @InjectRepository(Plan)
       private readonly plansRepository: Repository<Plan>,
       private readonly ekoService: EkoService,
@@ -66,7 +64,7 @@ export class ServicesService {
 
   async findOneForUser(id: string, userId: string): Promise<Service> {
     const service = await this.servicesRepository.findOne({
-      where: { id: id, user: { id: userId } },
+      where: { id, user: { id: userId } },
       relations: ['plan', 'user'],
     });
     if (!service) {

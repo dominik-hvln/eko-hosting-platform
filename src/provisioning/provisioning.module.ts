@@ -14,8 +14,8 @@ import { ServicesModule } from '../services/services.module';
         BullModule.registerQueue({
             name: 'provisioning',
         }),
-        ServersModule,  // Importujemy, aby mieć dostęp do ServersService
-        ServicesModule, // Importujemy, aby mieć dostęp do ServicesService
+        ServersModule,
+        ServicesModule,
         TypeOrmModule.forFeature([Service, Server]),
     ],
     providers: [ProvisioningProcessor],
