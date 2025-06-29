@@ -1,7 +1,108 @@
 ---
 - hosts: all
   become: yes
-  gather_facts: no
+  vars:
+    php_versions:
+      - "8.2"
+      - "8.1"
+      - "7.4"
+    mysql_root_password: "DoM#192856"
+
   tasks:
-    - name: Ping the server to test connection
-      ansible.builtin.ping:
+    - name: 1. Konfiguracja Systemu Podstawowego
+      block:
+        - name: Dodaj repozytorium PPA dla PHP (ondrej/php)
+          ansible.builtin.apt_repository:
+            repo: ppa:ondrej/php
+            state: present
+            update_cache: yes
+
+        - name: Zaktualizuj wszystkie pakiety systemowe
+          ansible.builtin.apt:
+            upgrade: dist
+            update_cache: yes
+
+    - name: 2. Instalacja Kluczowych Usług (WWW, Baza Danych, FTP, Poczta)
+      block:
+        - name: Zainstaluj Nginx, MariaDB, Serwer FTP i inne narzędzia
+          ansible.builtin.apt:
+            name:
+              - nginx
+              - mariadb-server
+              - python3-pymysql # Wymagane przez moduły Ansible dla MariaDB
+              - vsftpd
+              - ufw # Prosty firewall
+            state: latest
+
+        - name: Zainstaluj kompletny stos pocztowy (Postfix, Dovecot)
+          ansible.builtin.apt:
+            name:
+              - postfix
+              - dovecot-core
+              - dovecot-imapd
+              - dovecot-pop3d
+            state: latest
+
+    - name: 3. Instalacja Wielu Wersji PHP i Modułów
+      block:
+        - name: Zainstaluj wiele wersji PHP-FPM oraz popularne rozszerzenia
+          ansible.builtin.apt:
+            name: "php{{ item }}-fpm, php{{ item }}-mysql, php{{ item }}-cli, php{{ item }}-curl, php{{ item }}-gd, php{{ item }}-zip, php{{ item }}-mbstring, php{{ item }}-xml"
+            state: present
+          loop: "{{ php_versions }}"
+
+    - name: 4. Hardening i Konfiguracja Usług
+      block:
+        - name: Ustaw hasło roota dla MariaDB
+          community.mysql.mysql_user:
+            name: root
+            host: localhost
+            password: "{{ mysql_root_password }}"
+            login_unix_socket: /var/run/mysqld/mysqld.sock
+            check_implicit_admin: yes
+
+        - name: Usuń anonimowych użytkowników MariaDB
+          community.mysql.mysql_user:
+            name: ''
+            host: localhost
+            state: absent
+            login_unix_socket: /var/run/mysqld/mysqld.sock
+
+        - name: Usuń testową bazę danych
+          community.mysql.mysql_db:
+            name: test
+            state: absent
+            login_unix_socket: /var/run/mysqld/mysqld.sock
+
+        - name: Skonfiguruj firewall (UFW)
+          community.general.ufw:
+            rule: allow
+            port: "{{ item }}"
+          loop:
+            - "ssh"
+            - "http"
+            - "httpsa"
+            - "21/tcp"   # FTP
+            - "25/tcp"   # SMTP
+            - "143/tcp"  # IMAP
+            - "993/tcp"  # IMAPS
+            - "110/tcp"  # POP3
+            - "995/tcp"  # POP3S
+
+    - name: 5. Uruchomienie i Włączenie Usług
+      block:
+        - name: Upewnij się, że wszystkie kluczowe usługi są uruchomione i włączone
+          ansible.builtin.service:
+            name: "{{ item }}"
+            state: started
+            enabled: yes
+          loop:
+            - nginx
+            - mariadb
+            - vsftpd
+            - postfix
+            - dovecot
+            - "php8.2-fpm"
+            - "php8.1-fpm"
+            - "php7.4-fpm"
+            - ufw
