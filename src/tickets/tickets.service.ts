@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Ticket } from './entities/ticket.entity';
@@ -11,14 +15,17 @@ import { CreateMessageDto } from './dto/create-message.dto';
 @Injectable()
 export class TicketsService {
   constructor(
-      @InjectRepository(Ticket)
-      private readonly ticketsRepository: Repository<Ticket>,
-      @InjectRepository(TicketMessage)
-      private readonly ticketMessagesRepository: Repository<TicketMessage>,
-      private readonly dataSource: DataSource,
+    @InjectRepository(Ticket)
+    private readonly ticketsRepository: Repository<Ticket>,
+    @InjectRepository(TicketMessage)
+    private readonly ticketMessagesRepository: Repository<TicketMessage>,
+    private readonly dataSource: DataSource,
   ) {}
 
-  async create(createTicketDto: CreateTicketDto, authorId: string): Promise<Ticket> {
+  async create(
+    createTicketDto: CreateTicketDto,
+    authorId: string,
+  ): Promise<Ticket> {
     return this.dataSource.transaction(async (manager) => {
       const newTicket = manager.create(Ticket, {
         subject: createTicketDto.subject,
@@ -40,9 +47,9 @@ export class TicketsService {
   }
 
   async addMessage(
-      ticketId: string,
-      createMessageDto: CreateMessageDto,
-      user: { userId: string; role: Role },
+    ticketId: string,
+    createMessageDto: CreateMessageDto,
+    user: { userId: string; role: Role },
   ): Promise<TicketMessage> {
     // Używamy findOne, aby pobrać ticket i zweryfikować uprawnienia
     const ticket = await this.findOne(ticketId, user);
@@ -75,7 +82,10 @@ export class TicketsService {
     });
   }
 
-  async findOne(id: string, user: { userId: string; role: Role }): Promise<Ticket> {
+  async findOne(
+    id: string,
+    user: { userId: string; role: Role },
+  ): Promise<Ticket> {
     const ticket = await this.ticketsRepository.findOne({
       where: { id },
       relations: ['messages', 'messages.author', 'author', 'assignee'],

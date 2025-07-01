@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -36,9 +44,9 @@ export class TicketsController {
 
   @Post(':id/messages')
   addMessage(
-      @Param('id') id: string,
-      @Body() createMessageDto: CreateMessageDto,
-      @Request() req,
+    @Param('id') id: string,
+    @Body() createMessageDto: CreateMessageDto,
+    @Request() req,
   ) {
     return this.ticketsService.addMessage(id, createMessageDto, req.user);
   }

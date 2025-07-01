@@ -3,9 +3,9 @@ import { EkoService } from './eko.service';
 import { EkoController } from './eko.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EkoSettings } from './entities/eko-settings.entity';
-import {WalletModule} from "../wallet/wallet.module";
+import { WalletModule } from '../wallet/wallet.module';
 import { AuthModule } from '../auth/auth.module';
-import {EkoActionHistory} from "./entities/eko-action-history.entity";
+import { EkoActionHistory } from './entities/eko-action-history.entity';
 
 @Module({
   imports: [

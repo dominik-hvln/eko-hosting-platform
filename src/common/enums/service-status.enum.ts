@@ -1,5 +1,5 @@
 export enum ServiceStatus {
-    ACTIVE = 'active',
-    SUSPENDED = 'suspended',
-    CANCELLED = 'cancelled',
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended',
+  CANCELLED = 'cancelled',
 }

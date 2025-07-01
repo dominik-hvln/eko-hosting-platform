@@ -8,12 +8,7 @@ import { Wallet } from '../wallet/entities/wallet.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Service,
-      EkoActionHistory,
-      Transaction,
-      Wallet,
-    ]),
+    TypeOrmModule.forFeature([Service, EkoActionHistory, Transaction, Wallet]),
   ],
   providers: [RenewalsService],
 })

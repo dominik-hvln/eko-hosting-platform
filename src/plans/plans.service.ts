@@ -8,9 +8,9 @@ import { Repository } from 'typeorm';
 @Injectable()
 export class PlansService {
   constructor(
-      // Wstrzykujemy repozytorium Plan, aby móc operować na tabeli 'plans'
-      @InjectRepository(Plan)
-      private readonly plansRepository: Repository<Plan>,
+    // Wstrzykujemy repozytorium Plan, aby móc operować na tabeli 'plans'
+    @InjectRepository(Plan)
+    private readonly plansRepository: Repository<Plan>,
   ) {}
 
   // --- TĘ METODĘ NAPRAWIAMY ---

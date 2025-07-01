@@ -5,19 +5,21 @@ import { Exclude } from 'class-transformer';
 
 @Entity({ name: 'databases' })
 export class Database {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-    @Column()
-    name: string;
+  @Column()
+  name: string;
 
-    @Column()
-    user: string;
+  @Column()
+  user: string;
 
-    @Exclude()
-    @Column({ type: 'text' }) // Szyfrowane
-    password: string;
+  @Exclude()
+  @Column({ type: 'text' }) // Szyfrowane
+  password: string;
 
-    @ManyToOne(() => Service, (service) => service.databases, { onDelete: 'CASCADE' })
-    service: Service;
+  @ManyToOne(() => Service, (service) => service.databases, {
+    onDelete: 'CASCADE',
+  })
+  service: Service;
 }
