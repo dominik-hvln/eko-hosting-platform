@@ -46,7 +46,15 @@
       block:
         - name: Zainstaluj wiele wersji PHP-FPM oraz popularne rozszerzenia
           ansible.builtin.apt:
-            name: 'php{{ item }}-fpm, php{{ item }}-mysql, php{{ item }}-cli, php{{ item }}-curl, php{{ item }}-gd, php{{ item }}-zip, php{{ item }}-mbstring, php{{ item }}-xml'
+            name:
+              - 'php{{ item }}-fpm'
+              - 'php{{ item }}-mysql'
+              - 'php{{ item }}-cli'
+              - 'php{{ item }}-curl'
+              - 'php{{ item }}-gd'
+              - 'php{{ item }}-zip'
+              - 'php{{ item }}-mbstring'
+              - 'php{{ item }}-xml'
             state: present
           loop: '{{ php_versions }}'
 
@@ -80,7 +88,7 @@
           loop:
             - 'ssh'
             - 'http'
-            - 'httpsa'
+            - 'https'
             - '21/tcp' # FTP
             - '25/tcp' # SMTP
             - '143/tcp' # IMAP

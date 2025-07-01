@@ -4,6 +4,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { ServersService } from '../admin/servers/servers.service';
+import { EncryptionService } from '../common/encryption/encryption.service';
 import { NodeSSH } from 'node-ssh';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Service } from '../services/entities/service.entity';
@@ -21,6 +22,7 @@ export class ProvisioningProcessor extends WorkerHost {
 
   constructor(
     private readonly serversService: ServersService,
+    private readonly encryptionService: EncryptionService,
     @InjectRepository(Service)
     private readonly servicesRepository: Repository<Service>,
     @InjectRepository(Server)
@@ -57,7 +59,8 @@ export class ProvisioningProcessor extends WorkerHost {
     await this.serversRepository.save(server);
 
     const keyPath = path.join('/tmp', `ssh_key_${serverId}`);
-    fs.writeFileSync(keyPath, server.sshPrivateKey);
+    const decryptedKey = this.encryptionService.decrypt(server.sshPrivateKey);
+    fs.writeFileSync(keyPath, decryptedKey);
     fs.chmodSync(keyPath, '600');
 
     const command = `
@@ -131,7 +134,7 @@ export class ProvisioningProcessor extends WorkerHost {
       host: serverWithKey.ipAddress,
       port: serverWithKey.sshPort,
       username: serverWithKey.sshUser,
-      privateKey: serverWithKey.sshPrivateKey,
+      privateKey: this.encryptionService.decrypt(serverWithKey.sshPrivateKey),
       readyTimeout: 15000,
     });
     this.logger.log(`Połączono z serwerem ${server.name} przez SSH.`);
