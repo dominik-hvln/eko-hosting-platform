@@ -6,7 +6,6 @@
       - '8.2'
       - '8.1'
       - '7.4'
-    mysql_root_password: 'DoM#192856'
 
   tasks:
     - name: 1. Konfiguracja Systemu Podstawowego

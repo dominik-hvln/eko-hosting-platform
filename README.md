@@ -68,7 +68,24 @@ $ npm install -g @nestjs/mau
 $ mau deploy
 ```
 
+
 With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+
+## Ansible playbook
+
+The repository also contains a simple Ansible playbook located in
+`ansible/playbook.yml`. The playbook requires the `mysql_root_password`
+variable, which should be supplied from an external source. Create a variable
+file such as `ansible/group_vars/all/mysql.yml` (or use Ansible Vault) and store
+the password there:
+
+```yaml
+# ansible/group_vars/all/mysql.yml
+mysql_root_password: <your-production-password>
+```
+
+Encrypt the file with `ansible-vault` if necessary. During deployment Ansible
+will read the variable automatically.
 
 ## Resources
 

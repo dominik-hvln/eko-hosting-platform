@@ -1,0 +1,2 @@
+# Example MySQL root password definition
+mysql_root_password: changeme
