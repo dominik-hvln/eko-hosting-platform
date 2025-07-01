@@ -24,7 +24,7 @@ export class RenewalsService {
         private readonly dataSource: DataSource,
     ) {}
 
-    @Cron(CronExpression.EVERY_DAY_AT_1AM) // Zmieniamy na r_az dziennie w nocy
+    @Cron(CronExpression.EVERY_DAY_AT_1AM) // Zmieniamy na raz dziennie w nocy
     async handleRenewals() {
         this.logger.log('--- Running renewals cron job! ---');
 

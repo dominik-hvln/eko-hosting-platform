@@ -1,6 +1,4 @@
-// src/admin/servers/servers.service.ts
-
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EncryptionService } from '../../common/encryption/encryption.service';
@@ -11,6 +9,7 @@ import { NodeSSH } from 'node-ssh';
 import { ServerStatus } from '../../common/enums/server-status.enum';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class ServersService {
@@ -36,8 +35,15 @@ export class ServersService {
         if (!server) {
             throw new NotFoundException(`Serwer o ID ${serverId} nie istnieje.`);
         }
+
+        // Generujemy hasło roota i zapisujemy je (zaszyfrowane) przed dodaniem zadania do kolejki
+        const rootPassword = crypto.randomBytes(16).toString('hex');
+        server.mysqlRootPassword = this.encryptionService.encrypt(rootPassword);
+        await this.serversRepository.save(server);
+
         this.logger.log(`[PRODUCER] Zlecanie zadania 'provision-server' dla serwera ${serverId}`);
-        await this.provisioningQueue.add('provision-server', { serverId });
+        await this.provisioningQueue.add('provision-server', { serverId: serverId, rootPassword: rootPassword });
+
         return { message: `Zadanie provisioningu dla serwera ${serverId} zostało dodane do kolejki.` };
     }
 
@@ -54,7 +60,14 @@ export class ServersService {
 
     async testConnection(id: string): Promise<{ success: boolean; message: string; output?: string }> {
         const server = await this.findServerById(id);
-        const decryptedKey = this.encryptionService.decrypt(server.sshPrivateKey); // Deszyfrujemy klucz
+        let decryptedKey: string;
+
+        try {
+            decryptedKey = this.encryptionService.decrypt(server.sshPrivateKey);
+        } catch (error) {
+            this.logger.error(`Błąd deszyfrowania klucza SSH dla serwera ${id}: ${error.message}`);
+            throw new BadRequestException('Zapisany klucz SSH jest uszkodzony lub ma nieprawidłowy format. Proszę, zaktualizuj go.');
+        }
 
         const ssh = new NodeSSH();
         try {
@@ -62,7 +75,7 @@ export class ServersService {
                 host: server.ipAddress,
                 port: server.sshPort,
                 username: server.sshUser,
-                privateKey: decryptedKey, // Używamy zdeszyfrowanego klucza
+                privateKey: decryptedKey,
                 readyTimeout: 10000,
             });
 
@@ -71,7 +84,7 @@ export class ServersService {
 
             if (result.code === 0) {
                 server.status = ServerStatus.ONLINE;
-                await this.serversRepository.save(server); // Zapisujemy tylko zmianę statusu
+                await this.serversRepository.save(server);
                 return { success: true, message: 'Połączenie udane!', output: result.stdout };
             } else {
                 throw new Error(result.stderr || `Komenda zakończyła się kodem błędu: ${result.code}`);
@@ -79,7 +92,7 @@ export class ServersService {
         } catch (error) {
             ssh.dispose();
             server.status = ServerStatus.ERROR;
-            await this.serversRepository.save(server); // Zapisujemy tylko zmianę statusu
+            await this.serversRepository.save(server);
             return { success: false, message: error.message };
         }
     }
@@ -98,30 +111,12 @@ export class ServersService {
     }
 
     async findOne(id: string): Promise<Server> {
-        const server = await this.serversRepository.findOneBy({ id });
-        if (!server) {
-            throw new NotFoundException(`Serwer o ID ${id} nie został znaleziony.`);
-        }
-        if (server.sshPrivateKey) {
-            try {
-                server.sshPrivateKey = this.encryptionService.decrypt(server.sshPrivateKey);
-            } catch (e) {
-                this.logger.error(`Could not decrypt private key for server ${id}. It might be corrupted or not encrypted.`);
-                server.sshPrivateKey = 'BŁĄD DESZYFROWANIA KLUCZA';
-            }
-        }
-        return server;
-    }
-
-    async findOneForForm(id: string): Promise<Server> {
         const server = await this.findServerById(id);
-        // Deszyfrujemy klucz tylko na potrzeby wyświetlenia go (lub nie) w formularzu
-        // ale nie zapisujemy tej zmiany.
         try {
             server.sshPrivateKey = this.encryptionService.decrypt(server.sshPrivateKey);
         } catch (e) {
-            this.logger.error(`Błąd deszyfrowania klucza dla serwera ${id}. Może być uszkodzony.`);
-            server.sshPrivateKey = 'BŁĄD KLUCZA - WPROWADŹ PONOWNIE';
+            this.logger.error(`Could not decrypt private key for server ${id}. It might be corrupted or not encrypted.`);
+            server.sshPrivateKey = 'BŁĄD DESZYFROWANIA KLUCZA';
         }
         return server;
     }

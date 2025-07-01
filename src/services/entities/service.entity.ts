@@ -1,4 +1,3 @@
-// src/services/entities/service.entity.ts
 import {
     Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn,
 } from 'typeorm';
@@ -53,14 +52,14 @@ export class Service {
     @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
 
-    // NOWE RELACJE
     @OneToMany(() => Domain, (domain) => domain.service)
     domains: Domain[];
 
     @OneToMany(() => Database, (database) => database.service)
     databases: Database[];
 
-    @OneToMany(() => FtpAccount, (ftpAccount) => ftpAccount.service)
+    // POPRAWKA: Definiujemy typ relacji jawnie, aby pomóc TypeORM
+    @OneToMany(type => FtpAccount, ftpAccount => ftpAccount.service)
     ftpAccounts: FtpAccount[];
 
     @OneToMany(() => EmailAccount, (emailAccount) => emailAccount.service)

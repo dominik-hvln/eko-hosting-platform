@@ -1,5 +1,3 @@
-// src/admin/servers/entities/server.entity.ts
-
 import { ServerStatus } from '../../../common/enums/server-status.enum';
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
@@ -20,9 +18,12 @@ export class Server {
     @Column({ name: 'ssh_user', default: 'root' })
     sshUser: string;
 
-    // Klucz prywatny będzie przechowywany w formie zaszyfrowanej
     @Column({ name: 'ssh_private_key', type: 'text' })
     sshPrivateKey: string;
+
+    // NOWE POLE: Zaszyfrowane hasło roota MariaDB
+    @Column({ name: 'mysql_root_password', type: 'text', nullable: true })
+    mysqlRootPassword: string | null;
 
     @Column({
         type: 'enum',
@@ -31,7 +32,6 @@ export class Server {
     })
     status: ServerStatus;
 
-    // Prosty wskaźnik obciążenia, który będziemy rozwijać w przyszłości
     @Column({ name: 'load_index', type: 'integer', default: 0 })
     loadIndex: number;
 

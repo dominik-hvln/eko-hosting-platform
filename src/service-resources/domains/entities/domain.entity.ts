@@ -1,4 +1,3 @@
-// src/service-resources/domains/entities/domain.entity.ts
 import { Service } from '../../../services/entities/service.entity';
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { EmailAccount } from '../../email-accounts/entities/email-account.entity';
@@ -17,6 +16,7 @@ export class Domain {
     @ManyToOne(() => Service, (service) => service.domains, { onDelete: 'CASCADE' })
     service: Service;
 
-    @OneToMany(() => EmailAccount, (account) => account.domain)
+    // POPRAWKA: Definiujemy typ relacji jawnie, aby pomóc TypeORM
+    @OneToMany(type => EmailAccount, account => account.domain)
     emailAccounts: EmailAccount[];
 }

@@ -23,8 +23,9 @@ import { PaymentRequestsModule } from './payment-requests/payment-requests.modul
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ServersModule } from './admin/servers/servers.module';
-import { BullModule } from '@nestjs/bullmq'; // <-- NOWY IMPORT
+import { BullModule } from '@nestjs/bullmq';
 import { ProvisioningModule } from './provisioning/provisioning.module';
+import { ServiceResourcesModule } from './service-resources/service-resources.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { ProvisioningModule } from './provisioning/provisioning.module';
     PaymentRequestsModule,
     ServersModule,
     ProvisioningModule,
+    ServiceResourcesModule,
   ],
   controllers: [AppController],
   providers: [
