@@ -7,7 +7,10 @@ import { ServersModule } from '../admin/servers/servers.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Service } from '../services/entities/service.entity';
 import { Server } from '../admin/servers/entities/server.entity';
+import { Domain } from '../service-resources/domains/entities/domain.entity';
+import { Database } from '../service-resources/databases/entities/database.entity';
 import { ServicesModule } from '../services/services.module';
+import { EncryptionModule } from '../common/encryption/encryption.module';
 
 @Module({
   imports: [
@@ -16,7 +19,8 @@ import { ServicesModule } from '../services/services.module';
     }),
     ServersModule,
     ServicesModule,
-    TypeOrmModule.forFeature([Service, Server]),
+    EncryptionModule,
+    TypeOrmModule.forFeature([Service, Server, Domain, Database]),
   ],
   providers: [ProvisioningProcessor],
 })
