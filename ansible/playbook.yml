@@ -23,24 +23,19 @@
 
     - name: 2. Instalacja Kluczowych Usług (WWW, Baza Danych, FTP, Poczta)
       block:
-        - name: Pre-konfiguracja dla Postfix (aby uniknąć interaktywnych pytań)
-          ansible.builtin.debconf:
-            name: postfix
-            question: "{{ item.question }}"
-            value: "{{ item.value }}"
-            vtype: "{{ item.vtype }}"
-          loop:
-            - { question: 'postfix/main_mailer_type', value: 'Internet Site', vtype: 'select' }
-            - { question: 'postfix/mailname', value: '{{ ansible_fqdn | default("localhost") }}', vtype: 'string' }
-
         - name: Zainstaluj Nginx, MariaDB, Serwer FTP i inne narzędzia
           ansible.builtin.apt:
             name:
               - nginx
               - mariadb-server
-              - python3-pymysql
+              - python3-pymysql # Wymagane przez moduły Ansible dla MariaDB
               - vsftpd
-              - ufw
+              - ufw # Prosty firewall
+            state: latest
+
+        - name: Zainstaluj kompletny stos pocztowy (Postfix, Dovecot)
+          ansible.builtin.apt:
+            name:
               - postfix
               - dovecot-core
               - dovecot-imapd
@@ -52,18 +47,18 @@
         - name: Zainstaluj wiele wersji PHP-FPM oraz popularne rozszerzenia
           ansible.builtin.apt:
             name:
-              - "php{{ item }}-fpm"
-              - "php{{ item }}-mysql"
-              - "php{{ item }}-cli"
-              - "php{{ item }}-curl"
-              - "php{{ item }}-gd"
-              - "php{{ item }}-zip"
-              - "php{{ item }}-mbstring"
-              - "php{{ item }}-xml"
+              - 'php{{ item }}-fpm'
+              - 'php{{ item }}-mysql'
+              - 'php{{ item }}-cli'
+              - 'php{{ item }}-curl'
+              - 'php{{ item }}-gd'
+              - 'php{{ item }}-zip'
+              - 'php{{ item }}-mbstring'
+              - 'php{{ item }}-xml'
             state: present
           loop: '{{ php_versions }}'
 
-    - name: 4. Hardening i Konfiguracja MariaDB
+    - name: 4. Hardening i Konfiguracja Usług
       block:
         - name: Ustaw hasło roota dla MariaDB
           community.mysql.mysql_user:
@@ -80,8 +75,12 @@
             state: absent
             login_unix_socket: /var/run/mysqld/mysqld.sock
 
-    - name: 5. Konfiguracja Firewall i Usług
-      block:
+        - name: Usuń testową bazę danych
+          community.mysql.mysql_db:
+            name: test
+            state: absent
+            login_unix_socket: /var/run/mysqld/mysqld.sock
+
         - name: Skonfiguruj firewall (UFW)
           community.general.ufw:
             rule: allow
@@ -89,7 +88,7 @@
           loop:
             - 'ssh'
             - 'http'
-            - 'httpsa'
+            - 'https'
             - '21/tcp' # FTP
             - '25/tcp' # SMTP
             - '143/tcp' # IMAP
