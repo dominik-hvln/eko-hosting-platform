@@ -4,6 +4,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { ServersService } from '../admin/servers/servers.service';
+import { EncryptionService } from '../common/encryption/encryption.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Service } from '../services/entities/service.entity';
 import { Server } from '../admin/servers/entities/server.entity';
@@ -16,7 +17,6 @@ import * as fs from 'fs';
 import { exec } from 'child_process';
 import { ServerStatus } from '../common/enums/server-status.enum';
 import { ServiceStatus } from '../common/enums/service-status.enum';
-import { EncryptionService } from '../common/encryption/encryption.service';
 
 
 @Processor('provisioning')
@@ -72,7 +72,8 @@ export class ProvisioningProcessor extends WorkerHost {
         }
 
     const keyPath = path.join('/tmp', `ssh_key_${serverId}`);
-    fs.writeFileSync(keyPath, server.sshPrivateKey);
+    const decryptedKey = this.encryptionService.decrypt(server.sshPrivateKey);
+    fs.writeFileSync(keyPath, decryptedKey);
     fs.chmodSync(keyPath, '600');
 
         const playbookPath = path.resolve(process.cwd(), 'ansible/playbook.yml');
@@ -162,7 +163,7 @@ export class ProvisioningProcessor extends WorkerHost {
             host: serverWithKey.ipAddress,
             port: serverWithKey.sshPort,
             username: serverWithKey.sshUser,
-            privateKey: serverWithKey.sshPrivateKey,
+            privateKey: this.encryptionService.decrypt(serverWithKey.sshPrivateKey),
             readyTimeout: 15000,
         });
 

@@ -42,6 +42,12 @@
               - dovecot-pop3d
             state: latest
 
+        - name: Skopiuj skrypt do tworzenia kont hostingowych
+          ansible.builtin.copy:
+            src: '{{ playbook_dir }}/scripts/create_account.sh'
+            dest: /usr/local/bin/create_account.sh
+            mode: '0755'
+
     - name: 3. Instalacja Wielu Wersji PHP i Modułów
       block:
         - name: Zainstaluj wiele wersji PHP-FPM oraz popularne rozszerzenia

@@ -10,7 +10,7 @@ import { Server } from '../admin/servers/entities/server.entity';
 import { ServicesModule } from '../services/services.module';
 import { Domain } from '../service-resources/domains/entities/domain.entity';
 import { Database } from '../service-resources/databases/entities/database.entity';
-import { EncryptionModule } from '../common/encryption/encryption.module'; // NOWY IMPORT
+import { EncryptionModule } from '../common/encryption/encryption.module';
 
 @Module({
   imports: [
@@ -19,7 +19,8 @@ import { EncryptionModule } from '../common/encryption/encryption.module'; // NO
     }),
     ServersModule,
     ServicesModule,
-    TypeOrmModule.forFeature([Service, Server]),
+    EncryptionModule,
+    TypeOrmModule.forFeature([Service, Server, Domain, Database])
   ],
   providers: [ProvisioningProcessor],
 })
