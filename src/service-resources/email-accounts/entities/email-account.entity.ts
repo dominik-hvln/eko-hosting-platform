@@ -6,22 +6,26 @@ import { Domain } from '../../domains/entities/domain.entity';
 
 @Entity({ name: 'email_accounts' })
 export class EmailAccount {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-    @Column({ name: 'email_address', unique: true })
-    emailAddress: string;
+  @Column({ name: 'email_address', unique: true })
+  emailAddress: string;
 
-    @Exclude()
-    @Column({ type: 'text' }) // Szyfrowane
-    password: string;
+  @Exclude()
+  @Column({ type: 'text' }) // Szyfrowane
+  password: string;
 
-    @Column({ name: 'quota_mb', default: 1024 })
-    quotaMb: number;
+  @Column({ name: 'quota_mb', default: 1024 })
+  quotaMb: number;
 
-    @ManyToOne(() => Service, (service) => service.emailAccounts, { onDelete: 'CASCADE' })
-    service: Service;
+  @ManyToOne(() => Service, (service) => service.emailAccounts, {
+    onDelete: 'CASCADE',
+  })
+  service: Service;
 
-    @ManyToOne(() => Domain, (domain) => domain.emailAccounts, { onDelete: 'CASCADE' })
-    domain: Domain;
+  @ManyToOne(() => Domain, (domain) => domain.emailAccounts, {
+    onDelete: 'CASCADE',
+  })
+  domain: Domain;
 }

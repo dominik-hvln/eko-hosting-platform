@@ -8,14 +8,17 @@ import { Transaction } from '../transactions/entities/transaction.entity';
 import { TransactionStatus } from '../common/enums/transaction-status.enum';
 import { TransactionType } from '../common/enums/transaction-type.enum';
 import { v4 as uuidv4 } from 'uuid';
-import { EkoActionHistory, EkoActionType } from '../eko/entities/eko-action-history.entity';
+import {
+  EkoActionHistory,
+  EkoActionType,
+} from '../eko/entities/eko-action-history.entity';
 
 @Injectable()
 export class WalletService {
   constructor(
-      @InjectRepository(Wallet)
-      private readonly walletsRepository: Repository<Wallet>,
-      private readonly dataSource: DataSource,
+    @InjectRepository(Wallet)
+    private readonly walletsRepository: Repository<Wallet>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(userId: string): Promise<Wallet> {
@@ -37,7 +40,11 @@ export class WalletService {
     return wallet;
   }
 
-  async handleEkoRedemption(userId: string, pointsSpent: number, creditAmount: number) {
+  async handleEkoRedemption(
+    userId: string,
+    pointsSpent: number,
+    creditAmount: number,
+  ) {
     return this.dataSource.transaction(async (manager) => {
       const wallet = await manager.findOneBy(Wallet, { user: { id: userId } });
       if (!wallet) throw new NotFoundException('Wallet not found');
@@ -74,7 +81,8 @@ export class WalletService {
   async addEkoPoints(userId: string, pointsToAdd: number) {
     const wallet = await this.findOneByUserId(userId);
     wallet.ekoPoints = parseFloat(wallet.ekoPoints.toString()) + pointsToAdd;
-    wallet.lifetimeEkoPoints = parseFloat(wallet.lifetimeEkoPoints.toString()) + pointsToAdd;
+    wallet.lifetimeEkoPoints =
+      parseFloat(wallet.lifetimeEkoPoints.toString()) + pointsToAdd;
     return this.walletsRepository.save(wallet);
   }
 }

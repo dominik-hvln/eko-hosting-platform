@@ -10,14 +10,14 @@ import { Server } from '../admin/servers/entities/server.entity';
 import { ServicesModule } from '../services/services.module';
 
 @Module({
-    imports: [
-        BullModule.registerQueue({
-            name: 'provisioning',
-        }),
-        ServersModule,
-        ServicesModule,
-        TypeOrmModule.forFeature([Service, Server]),
-    ],
-    providers: [ProvisioningProcessor],
+  imports: [
+    BullModule.registerQueue({
+      name: 'provisioning',
+    }),
+    ServersModule,
+    ServicesModule,
+    TypeOrmModule.forFeature([Service, Server]),
+  ],
+  providers: [ProvisioningProcessor],
 })
 export class ProvisioningModule {}
