@@ -1,3 +1,5 @@
+// src/provisioning/provisioning.module.ts
+
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ProvisioningProcessor } from './provisioning.processor';
@@ -11,13 +13,14 @@ import { Database } from '../service-resources/databases/entities/database.entit
 import { EncryptionModule } from '../common/encryption/encryption.module'; // NOWY IMPORT
 
 @Module({
-    imports: [
-        BullModule.registerQueue({ name: 'provisioning' }),
-        ServersModule,
-        ServicesModule,
-        EncryptionModule, // <-- DODAJEMY MODUŁ SZYFROWANIA TUTAJ
-        TypeOrmModule.forFeature([Service, Server, Domain, Database]),
-    ],
-    providers: [ProvisioningProcessor],
+  imports: [
+    BullModule.registerQueue({
+      name: 'provisioning',
+    }),
+    ServersModule,
+    ServicesModule,
+    TypeOrmModule.forFeature([Service, Server]),
+  ],
+  providers: [ProvisioningProcessor],
 })
 export class ProvisioningModule {}

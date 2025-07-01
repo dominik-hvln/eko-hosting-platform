@@ -1,6 +1,17 @@
 // src/eko/eko.controller.ts
 
-import { Controller, Get, Post, Body, UseGuards, Patch, Query, Res, HttpCode, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Patch,
+  Query,
+  Res,
+  HttpCode,
+  Req,
+} from '@nestjs/common';
 import { EkoService } from './eko.service';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -54,8 +65,8 @@ export class EkoController {
   @UseGuards(AuthGuard('jwt'))
   @Post('redeem')
   redeemPoints(
-      @GetUser() user: { userId: string },
-      @Body() dto: RedeemPointsDto,
+    @GetUser() user: { userId: string },
+    @Body() dto: RedeemPointsDto,
   ) {
     return this.ekoService.redeemPointsForCredit(user.userId, dto.points);
   }

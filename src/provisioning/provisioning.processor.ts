@@ -21,7 +21,7 @@ import { EncryptionService } from '../common/encryption/encryption.service';
 
 @Processor('provisioning')
 export class ProvisioningProcessor extends WorkerHost {
-    private readonly logger = new Logger(ProvisioningProcessor.name);
+  private readonly logger = new Logger(ProvisioningProcessor.name);
 
     constructor(
         private readonly serversService: ServersService,
@@ -34,8 +34,10 @@ export class ProvisioningProcessor extends WorkerHost {
         super();
     }
 
-    async process(job: Job<any, any, string>): Promise<any> {
-        this.logger.log(`[WORKER] Otrzymano zadanie [${job.id}] o nazwie: ${job.name}`);
+  async process(job: Job<any, any, string>): Promise<any> {
+    this.logger.log(
+      `[WORKER] Otrzymano zadanie [${job.id}] o nazwie: ${job.name}`,
+    );
 
         switch (job.name) {
             case 'provision-server':
@@ -69,9 +71,9 @@ export class ProvisioningProcessor extends WorkerHost {
             await this.serversRepository.save(serverToUpdate);
         }
 
-        const keyPath = path.join('/tmp', `ssh_key_${serverId}`);
-        fs.writeFileSync(keyPath, server.sshPrivateKey);
-        fs.chmodSync(keyPath, '600');
+    const keyPath = path.join('/tmp', `ssh_key_${serverId}`);
+    fs.writeFileSync(keyPath, server.sshPrivateKey);
+    fs.chmodSync(keyPath, '600');
 
         const playbookPath = path.resolve(process.cwd(), 'ansible/playbook.yml');
         // POPRAWKA: Dodano flagę -vvv dla bardziej szczegółowych logów
@@ -118,15 +120,22 @@ export class ProvisioningProcessor extends WorkerHost {
         return { done: true, serverId: server.id };
     }
 
-    private async handleCreateHostingAccount(job: Job) {
-        const { serviceId } = job.data;
-        this.logger.log(`Rozpoczynam logikę dla 'create-hosting-account', usługa: ${serviceId}`);
+  private async handleCreateHostingAccount(job: Job) {
+    const { serviceId } = job.data;
+    this.logger.log(
+      `Rozpoczynam logikę dla 'create-hosting-account', usługa: ${serviceId}`,
+    );
 
-        const service = await this.servicesRepository.findOne({ where: { id: serviceId }, relations: ['user', 'plan']});
-        if (!service) throw new Error(`Usługa o ID ${serviceId} nie istnieje.`);
+    const service = await this.servicesRepository.findOne({
+      where: { id: serviceId },
+      relations: ['user', 'plan'],
+    });
+    if (!service) throw new Error(`Usługa o ID ${serviceId} nie istnieje.`);
 
-        const server = await this.serversService.findLeastLoadedServer();
-        this.logger.log(`Wybrano serwer: ${server.name} (${server.ipAddress}) dla usługi ${serviceId}`);
+    const server = await this.serversService.findLeastLoadedServer();
+    this.logger.log(
+      `Wybrano serwer: ${server.name} (${server.ipAddress}) dla usługi ${serviceId}`,
+    );
 
         const username = `${service.user.email.split('@')[0]}${Math.floor(Math.random() * 1000)}`.replace(/[^a-zA-Z0-9]/g, '');
         const command = `/usr/local/bin/create_account.sh ${username}`;

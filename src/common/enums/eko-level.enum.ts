@@ -1,5 +1,5 @@
 export enum EkoLevel {
-    SEEDLING = 'seedling', // Sadzonka
-    SAPLING = 'sapling',   // Młode Drzewko
-    OAK = 'oak',           // Dąb
+  SEEDLING = 'seedling', // Sadzonka
+  SAPLING = 'sapling', // Młode Drzewko
+  OAK = 'oak', // Dąb
 }

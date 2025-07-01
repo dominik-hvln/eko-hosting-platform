@@ -1,5 +1,5 @@
 export enum TicketPriority {
-    LOW = 'low',
-    MEDIUM = 'medium',
-    HIGH = 'high',
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
 }

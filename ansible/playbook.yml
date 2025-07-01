@@ -3,9 +3,10 @@
   become: yes
   vars:
     php_versions:
-      - "8.2"
-      - "8.1"
-      - "7.4"
+      - '8.2'
+      - '8.1'
+      - '7.4'
+    mysql_root_password: 'DoM#192856'
 
   tasks:
     - name: 1. Konfiguracja Systemu Podstawowego
@@ -21,7 +22,7 @@
             upgrade: dist
             update_cache: yes
 
-    - name: 2. Instalacja Kluczowych Usług
+    - name: 2. Instalacja Kluczowych Usług (WWW, Baza Danych, FTP, Poczta)
       block:
         - name: Pre-konfiguracja dla Postfix (aby uniknąć interaktywnych pytań)
           ansible.builtin.debconf:
@@ -61,44 +62,47 @@
               - "php{{ item }}-mbstring"
               - "php{{ item }}-xml"
             state: present
-          loop: "{{ php_versions }}"
+          loop: '{{ php_versions }}'
 
     - name: 4. Hardening i Konfiguracja MariaDB
       block:
-        - name: Zabezpiecz instalację MariaDB za pomocą bezpośredniego skryptu SQL
-          ansible.builtin.shell: |
-            mysql -u root <<EOF
-            ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ mysql_root_password }}';
-            DELETE FROM mysql.user WHERE User='';
-            DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
-            DROP DATABASE IF EXISTS test;
-            DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
-            FLUSH PRIVILEGES;
-            EOF
-          args:
-            executable: /bin/bash
-          changed_when: false
+        - name: Ustaw hasło roota dla MariaDB
+          community.mysql.mysql_user:
+            name: root
+            host: localhost
+            password: '{{ mysql_root_password }}'
+            login_unix_socket: /var/run/mysqld/mysqld.sock
+            check_implicit_admin: yes
+
+        - name: Usuń anonimowych użytkowników MariaDB
+          community.mysql.mysql_user:
+            name: ''
+            host: localhost
+            state: absent
+            login_unix_socket: /var/run/mysqld/mysqld.sock
 
     - name: 5. Konfiguracja Firewall i Usług
       block:
         - name: Skonfiguruj firewall (UFW)
           community.general.ufw:
             rule: allow
-            port: "{{ item }}"
+            port: '{{ item }}'
           loop:
-            - "ssh"
-            - "http"
-            - "https"
-            - "21/tcp"
-            - "25/tcp"
-            - "143/tcp"
-            - "993/tcp"
-            - "110/tcp"
-            - "995/tcp"
+            - 'ssh'
+            - 'http'
+            - 'httpsa'
+            - '21/tcp' # FTP
+            - '25/tcp' # SMTP
+            - '143/tcp' # IMAP
+            - '993/tcp' # IMAPS
+            - '110/tcp' # POP3
+            - '995/tcp' # POP3S
 
+    - name: 5. Uruchomienie i Włączenie Usług
+      block:
         - name: Upewnij się, że wszystkie kluczowe usługi są uruchomione i włączone
           ansible.builtin.service:
-            name: "{{ item }}"
+            name: '{{ item }}'
             state: started
             enabled: yes
           loop:
@@ -107,7 +111,7 @@
             - vsftpd
             - postfix
             - dovecot
-            - "php8.2-fpm"
-            - "php8.1-fpm"
-            - "php7.4-fpm"
+            - 'php8.2-fpm'
+            - 'php8.1-fpm'
+            - 'php7.4-fpm'
             - ufw

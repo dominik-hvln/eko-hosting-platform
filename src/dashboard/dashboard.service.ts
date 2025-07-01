@@ -8,9 +8,9 @@ import { UsersService } from '../users/users.service';
 @Injectable()
 export class DashboardService {
   constructor(
-      private readonly walletService: WalletService,
-      private readonly servicesService: ServicesService,
-      private readonly usersService: UsersService,
+    private readonly walletService: WalletService,
+    private readonly servicesService: ServicesService,
+    private readonly usersService: UsersService,
   ) {}
 
   async getSummary(userId: string) {

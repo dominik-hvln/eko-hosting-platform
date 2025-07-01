@@ -6,8 +6,8 @@ import { Repository } from 'typeorm';
 @Injectable()
 export class TransactionsService {
   constructor(
-      @InjectRepository(Transaction)
-      private readonly transactionsRepository: Repository<Transaction>,
+    @InjectRepository(Transaction)
+    private readonly transactionsRepository: Repository<Transaction>,
   ) {}
 
   // --- NOWA METODA ---

@@ -7,18 +7,18 @@ import { RolesGuard } from './guards/roles.guard';
 
 @Controller('auth')
 export class AuthController {
-    constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) {}
 
-    @UseGuards(AuthGuard('local'))
-    @Post('login')
-    async login(@Request() req) {
-        return this.authService.login(req.user);
-    }
+  @UseGuards(AuthGuard('local'))
+  @Post('login')
+  async login(@Request() req) {
+    return this.authService.login(req.user);
+  }
 
-    @Post('impersonate/:userId')
-    @Roles(Role.ADMIN) // Tylko admin może używać tej funkcji
-    @UseGuards(AuthGuard('jwt'), RolesGuard)
-    async impersonate(@Param('userId') userId: string) {
-        return this.authService.impersonate(userId);
-    }
+  @Post('impersonate/:userId')
+  @Roles(Role.ADMIN) // Tylko admin może używać tej funkcji
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  async impersonate(@Param('userId') userId: string) {
+    return this.authService.impersonate(userId);
+  }
 }

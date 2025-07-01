@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import Stripe from 'stripe';
@@ -28,30 +33,40 @@ export class PaymentsService {
   private readonly frontendUrl: string;
 
   constructor(
-      @InjectRepository(User) private readonly usersRepository: Repository<User>,
-      @InjectRepository(Service) private readonly servicesRepository: Repository<Service>,
-      @InjectQueue('provisioning') private readonly provisioningQueue: Queue,
-      private readonly stripeService: StripeService,
-      private readonly payuService: PayUService,
-      private readonly configService: ConfigService,
-      private readonly invoicesService: InvoicesService,
-      private readonly servicesService: ServicesService,
-      private readonly paymentRequestsService: PaymentRequestsService,
-      private readonly dataSource: DataSource,
+    @InjectRepository(User) private readonly usersRepository: Repository<User>,
+    @InjectRepository(Service)
+    private readonly servicesRepository: Repository<Service>,
+    @InjectQueue('provisioning') private readonly provisioningQueue: Queue,
+    private readonly stripeService: StripeService,
+    private readonly payuService: PayUService,
+    private readonly configService: ConfigService,
+    private readonly invoicesService: InvoicesService,
+    private readonly servicesService: ServicesService,
+    private readonly paymentRequestsService: PaymentRequestsService,
+    private readonly dataSource: DataSource,
   ) {
     // POPRAWKA 1: Dodajemy '!' aby zapewnić, że zmienna istnieje, lub fallback.
     this.frontendUrl = this.configService.get<string>('FRONTEND_URL')!;
   }
 
   async createSubscription(userId: string, serviceId: string) {
-    this.logger.log(`Attempting to create subscription for service ${serviceId} for user ${userId}`);
-    const service = await this.servicesService.findOneForUser(serviceId, userId);
+    this.logger.log(
+      `Attempting to create subscription for service ${serviceId} for user ${userId}`,
+    );
+    const service = await this.servicesService.findOneForUser(
+      serviceId,
+      userId,
+    );
 
     const isYearly = service.billingCycle === BillingCycle.YEARLY;
-    const priceId = isYearly ? service.plan.stripeYearlyPriceId : service.plan.stripeMonthlyPriceId;
+    const priceId = isYearly
+      ? service.plan.stripeYearlyPriceId
+      : service.plan.stripeMonthlyPriceId;
 
     if (!priceId) {
-      throw new BadRequestException(`Płatność subskrypcyjna dla tego planu i cyklu rozliczeniowego nie jest skonfigurowana.`);
+      throw new BadRequestException(
+        `Płatność subskrypcyjna dla tego planu i cyklu rozliczeniowego nie jest skonfigurowana.`,
+      );
     }
 
     const args = {
@@ -68,7 +83,11 @@ export class PaymentsService {
     return this.stripeService.createSubscriptionSession(args);
   }
 
-  async createTopUpSession(user: Omit<User, 'password'>, createPaymentDto: CreatePaymentDto, provider: 'stripe' | 'payu') {
+  async createTopUpSession(
+    user: Omit<User, 'password'>,
+    createPaymentDto: CreatePaymentDto,
+    provider: 'stripe' | 'payu',
+  ) {
     const amountInPLN = createPaymentDto.amount.toFixed(2);
     const args = {
       amount: createPaymentDto.amount * 100,
@@ -79,18 +98,24 @@ export class PaymentsService {
       paymentDescription: `Doładowanie portfela EKO-HOSTING za ${amountInPLN} PLN`,
       metadata: { type: 'wallet_top_up', userId: user.id },
     };
-    if (provider === 'stripe') return this.stripeService.createPaymentSession(args);
+    if (provider === 'stripe')
+      return this.stripeService.createPaymentSession(args);
     if (provider === 'payu') return this.payuService.createPaymentSession(args);
     throw new BadRequestException('Invalid payment provider');
   }
 
   async createServiceRenewalSession(userId: string, serviceId: string) {
-    const service = await this.servicesService.findOneForUser(serviceId, userId);
+    const service = await this.servicesService.findOneForUser(
+      serviceId,
+      userId,
+    );
     const isYearly = service.billingCycle === BillingCycle.YEARLY;
     const price = isYearly ? service.plan.yearlyPrice : service.plan.price;
 
     if (price === null || price === undefined) {
-      throw new BadRequestException(`Cena dla cyklu rozliczeniowego "${isYearly ? 'rocznego' : 'miesięcznego'}" w planie "${service.plan.name}" nie jest zdefiniowana.`);
+      throw new BadRequestException(
+        `Cena dla cyklu rozliczeniowego "${isYearly ? 'rocznego' : 'miesięcznego'}" w planie "${service.plan.name}" nie jest zdefiniowana.`,
+      );
     }
 
     const amountInGr = Math.round(parseFloat(price) * 100);
@@ -101,13 +126,20 @@ export class PaymentsService {
       successUrl: `${this.frontendUrl}/dashboard/services/${serviceId}?payment=success`,
       cancelUrl: `${this.frontendUrl}/dashboard/services/${serviceId}`,
       paymentDescription: `Odnowienie usługi: ${service.name} (${isYearly ? 'rocznie' : 'miesięcznie'})`,
-      metadata: { type: 'service_renewal', serviceId: service.id, userId: userId },
+      metadata: {
+        type: 'service_renewal',
+        serviceId: service.id,
+        userId: userId,
+      },
     };
     return this.stripeService.createPaymentSession(args);
   }
 
   async createRequestPaymentSession(userId: string, requestId: string) {
-    const request = await this.paymentRequestsService.findOneForUser(requestId, userId);
+    const request = await this.paymentRequestsService.findOneForUser(
+      requestId,
+      userId,
+    );
     const args = {
       amount: request.amount,
       currency: 'pln',
@@ -121,11 +153,18 @@ export class PaymentsService {
   }
 
   async handleStripeWebhook(signature: string, rawBody: Buffer) {
-    const stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY')!, { apiVersion: '2025-05-28.basil' });
+    const stripe = new Stripe(
+      this.configService.get<string>('STRIPE_SECRET_KEY')!,
+      { apiVersion: '2025-05-28.basil' },
+    );
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(rawBody, signature, this.configService.get<string>('STRIPE_WEBHOOK_SECRET')!);
+      event = stripe.webhooks.constructEvent(
+        rawBody,
+        signature,
+        this.configService.get<string>('STRIPE_WEBHOOK_SECRET')!,
+      );
     } catch (err) {
       throw new BadRequestException(`Webhook Error: ${err.message}`);
     }
@@ -172,7 +211,9 @@ export class PaymentsService {
   private async handleSubscriptionCreation(session: Stripe.Checkout.Session) {
     this.logger.log(`Handling new subscription from session: ${session.id}`);
     if (!session.metadata) {
-      this.logger.error(`Webhook "checkout.session.completed" is missing metadata. Session: ${session.id}`);
+      this.logger.error(
+        `Webhook "checkout.session.completed" is missing metadata. Session: ${session.id}`,
+      );
       return;
     }
     const { userId, serviceId } = session.metadata;
@@ -180,7 +221,9 @@ export class PaymentsService {
     const stripeCustomerId = session.customer?.toString();
 
     if (!userId || !serviceId || !stripeSubscriptionId || !stripeCustomerId) {
-      this.logger.error(`Webhook "checkout.session.completed" for subscription is missing metadata. Session: ${session.id}`);
+      this.logger.error(
+        `Webhook "checkout.session.completed" for subscription is missing metadata. Session: ${session.id}`,
+      );
       return;
     }
 
@@ -189,7 +232,9 @@ export class PaymentsService {
       const service = await manager.findOneBy(Service, { id: serviceId });
 
       if (!user || !service) {
-        this.logger.error(`User (${userId}) or Service (${serviceId}) not found for subscription creation.`);
+        this.logger.error(
+          `User (${userId}) or Service (${serviceId}) not found for subscription creation.`,
+        );
         return;
       }
 
@@ -210,12 +255,16 @@ export class PaymentsService {
 
       await manager.save(user);
       await manager.save(service);
-      this.logger.log(`Subscription ${stripeSubscriptionId} successfully linked to service ${serviceId}.`);
+      this.logger.log(
+        `Subscription ${stripeSubscriptionId} successfully linked to service ${serviceId}.`,
+      );
       // --- DODAJEMY ZADANIE DO KOLEJKI ---
       await this.provisioningQueue.add('create-hosting-account', {
         serviceId: service.id,
       });
-      this.logger.log(`Job 'create-hosting-account' for service ${service.id} added to the provisioning queue.`);
+      this.logger.log(
+        `Job 'create-hosting-account' for service ${service.id} added to the provisioning queue.`,
+      );
       // ---------------------------------
     });
   }
@@ -223,11 +272,15 @@ export class PaymentsService {
   private async handleSubscriptionRenewal(invoice: Stripe.Invoice) {
     const stripeSubscriptionId = invoice.lines.data[0]?.subscription;
     if (typeof stripeSubscriptionId !== 'string') {
-      this.logger.error(`Could not extract a valid subscription ID string from invoice: ${invoice.id}`);
+      this.logger.error(
+        `Could not extract a valid subscription ID string from invoice: ${invoice.id}`,
+      );
       return;
     }
 
-    this.logger.log(`Handling subscription renewal for subscription: ${stripeSubscriptionId}`);
+    this.logger.log(
+      `Handling subscription renewal for subscription: ${stripeSubscriptionId}`,
+    );
 
     return this.dataSource.transaction(async (manager) => {
       const service = await manager.findOne(Service, {
@@ -236,7 +289,9 @@ export class PaymentsService {
       });
 
       if (!service) {
-        this.logger.warn(`Received renewal for unknown subscription: ${stripeSubscriptionId}`);
+        this.logger.warn(
+          `Received renewal for unknown subscription: ${stripeSubscriptionId}`,
+        );
         return;
       }
 
@@ -249,7 +304,9 @@ export class PaymentsService {
       }
       service.expiresAt = newExpiryDate;
       await manager.save(service);
-      this.logger.log(`Service ${service.id} renewed via subscription until ${newExpiryDate.toISOString()}`);
+      this.logger.log(
+        `Service ${service.id} renewed via subscription until ${newExpiryDate.toISOString()}`,
+      );
 
       // Tworzymy transakcję i fakturę
       const amount = invoice.amount_paid / 100;
@@ -264,32 +321,52 @@ export class PaymentsService {
         description: `Odnowienie subskrypcji: ${service.name}`,
       });
       await manager.save(newTransaction);
-      await this.invoicesService.createForTransaction(service.user, newTransaction);
+      await this.invoicesService.createForTransaction(
+        service.user,
+        newTransaction,
+      );
     });
   }
 
-  private async handleSubscriptionCancellation(subscription: Stripe.Subscription) {
-    this.logger.log(`Handling subscription cancellation for: ${subscription.id}`);
-    const service = await this.servicesRepository.findOneBy({ stripeSubscriptionId: subscription.id });
+  private async handleSubscriptionCancellation(
+    subscription: Stripe.Subscription,
+  ) {
+    this.logger.log(
+      `Handling subscription cancellation for: ${subscription.id}`,
+    );
+    const service = await this.servicesRepository.findOneBy({
+      stripeSubscriptionId: subscription.id,
+    });
 
     if (service) {
       // Usługa pozostaje aktywna do końca opłaconego okresu.
       // Możemy tu dodać logikę powiadomień dla admina lub klienta.
-      this.logger.log(`Subscription for service ${service.id} was cancelled. It will expire on ${service.expiresAt}.`);
+      this.logger.log(
+        `Subscription for service ${service.id} was cancelled. It will expire on ${service.expiresAt}.`,
+      );
     }
   }
 
   private async handleWalletTopUpPayment(session: Stripe.Checkout.Session) {
-    const { customer_email: customerEmail, amount_total: amountTotal, id: sessionId } = session;
+    const {
+      customer_email: customerEmail,
+      amount_total: amountTotal,
+      id: sessionId,
+    } = session;
     if (!customerEmail || !amountTotal) return;
 
     return this.dataSource.transaction(async (manager) => {
       const walletRepo = manager.getRepository(Wallet);
       const transactionRepo = manager.getRepository(Transaction);
-      const wallet = await walletRepo.findOne({ where: { user: { email: customerEmail } }, relations: ['user'] });
+      const wallet = await walletRepo.findOne({
+        where: { user: { email: customerEmail } },
+        relations: ['user'],
+      });
       if (!wallet) return;
 
-      const existingTx = await transactionRepo.findOne({ where: { providerTransactionId: sessionId } });
+      const existingTx = await transactionRepo.findOne({
+        where: { providerTransactionId: sessionId },
+      });
       if (existingTx) return;
 
       const amountToAdd = amountTotal / 100;
@@ -297,8 +374,13 @@ export class PaymentsService {
       await walletRepo.save(wallet);
 
       const newTx = transactionRepo.create({
-        wallet, amount: amountToAdd, currency: 'pln', status: TransactionStatus.COMPLETED,
-        type: TransactionType.TOP_UP, provider: 'stripe', providerTransactionId: sessionId,
+        wallet,
+        amount: amountToAdd,
+        currency: 'pln',
+        status: TransactionStatus.COMPLETED,
+        type: TransactionType.TOP_UP,
+        provider: 'stripe',
+        providerTransactionId: sessionId,
       });
       await transactionRepo.save(newTx);
       await this.invoicesService.createForTransaction(wallet.user, newTx);
@@ -311,7 +393,9 @@ export class PaymentsService {
     const amountTotal = session.amount_total;
 
     if (!serviceId || amountTotal === null || amountTotal === undefined) {
-      this.logger.error(`Webhook event "service_renewal" is missing data. Session: ${session.id}`);
+      this.logger.error(
+        `Webhook event "service_renewal" is missing data. Session: ${session.id}`,
+      );
       return;
     }
 
@@ -322,18 +406,26 @@ export class PaymentsService {
       });
 
       if (!service) {
-        this.logger.error(`Service with ID ${serviceId} not found for renewal.`);
+        this.logger.error(
+          `Service with ID ${serviceId} not found for renewal.`,
+        );
         return;
       }
-      this.logger.log(`Found service ${service.id} to renew. Current expiry: ${service.expiresAt}`);
+      this.logger.log(
+        `Found service ${service.id} to renew. Current expiry: ${service.expiresAt}`,
+      );
 
-      const newExpiryDate = service.expiresAt ? new Date(service.expiresAt) : new Date();
+      const newExpiryDate = service.expiresAt
+        ? new Date(service.expiresAt)
+        : new Date();
       newExpiryDate.setMonth(newExpiryDate.getMonth() + 1);
       service.expiresAt = newExpiryDate;
       service.status = ServiceStatus.ACTIVE;
       await manager.save(service);
 
-      this.logger.log(`Service ${service.id} renewed successfully. New expiry: ${service.expiresAt}`);
+      this.logger.log(
+        `Service ${service.id} renewed successfully. New expiry: ${service.expiresAt}`,
+      );
 
       const amount = amountTotal / 100;
       const newTransaction = manager.create(Transaction, {
@@ -349,7 +441,10 @@ export class PaymentsService {
       await manager.save(newTransaction);
       this.logger.log(`Created transaction ${newTransaction.id} for renewal.`);
 
-      await this.invoicesService.createForTransaction(service.user, newTransaction);
+      await this.invoicesService.createForTransaction(
+        service.user,
+        newTransaction,
+      );
       this.logger.log(`Invoice created for transaction ${newTransaction.id}.`);
     });
   }
@@ -359,7 +454,9 @@ export class PaymentsService {
     const amountTotal = session.amount_total;
 
     if (!requestId || !amountTotal) {
-      this.logger.error(`Webhook "payment_request" missing data. Session: ${session.id}`);
+      this.logger.error(
+        `Webhook "payment_request" missing data. Session: ${session.id}`,
+      );
       return;
     }
 
@@ -370,7 +467,9 @@ export class PaymentsService {
       });
 
       if (!request || request.status === PaymentRequestStatus.PAID) {
-        this.logger.warn(`Payment request ${requestId} not found or already paid.`);
+        this.logger.warn(
+          `Payment request ${requestId} not found or already paid.`,
+        );
         return;
       }
 
@@ -392,16 +491,20 @@ export class PaymentsService {
         description: request.title, // Używamy tytułu z żądania jako opisu
       });
       await manager.save(newTransaction);
-      this.logger.log(`Created transaction ${newTransaction.id} for payment request.`);
+      this.logger.log(
+        `Created transaction ${newTransaction.id} for payment request.`,
+      );
 
       // 3. Generujemy fakturę do tej transakcji
       await this.invoicesService.createForTransaction(
-          request.user,
-          newTransaction,
+        request.user,
+        newTransaction,
       );
       this.logger.log(`Invoice created for transaction ${newTransaction.id}.`);
     });
   }
 
-  async handlePayuWebhook(signatureHeader: string, rawBody: Buffer) { /* Puste na razie */ }
+  async handlePayuWebhook(signatureHeader: string, rawBody: Buffer) {
+    /* Puste na razie */
+  }
 }

@@ -1,6 +1,16 @@
 // src/admin/servers/servers.controller.ts
 
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpCode } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  HttpCode,
+} from '@nestjs/common';
 import { ServersService } from './servers.service';
 import { CreateServerDto } from './dto/create-server.dto';
 import { UpdateServerDto } from './dto/update-server.dto';
@@ -13,43 +23,43 @@ import { Role } from '../../common/enums/role.enum';
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Roles(Role.ADMIN)
 export class ServersController {
-    constructor(private readonly serversService: ServersService) {}
+  constructor(private readonly serversService: ServersService) {}
 
-    // --- ENDPOINT DO PROVISIONINGU ---
-    @Post(':id/provision')
-    provisionServer(@Param('id') id: string) {
-        return this.serversService.queueServerProvisioning(id);
-    }
+  // --- ENDPOINT DO PROVISIONINGU ---
+  @Post(':id/provision')
+  provisionServer(@Param('id') id: string) {
+    return this.serversService.queueServerProvisioning(id);
+  }
 
-    @Post(':id/test-connection')
-    testConnection(@Param('id') id: string) {
-        return this.serversService.testConnection(id);
-    }
+  @Post(':id/test-connection')
+  testConnection(@Param('id') id: string) {
+    return this.serversService.testConnection(id);
+  }
 
-    // --- STANDARDOWE ENDPOINTY CRUD ---
-    @Post()
-    create(@Body() createServerDto: CreateServerDto) {
-        return this.serversService.create(createServerDto);
-    }
+  // --- STANDARDOWE ENDPOINTY CRUD ---
+  @Post()
+  create(@Body() createServerDto: CreateServerDto) {
+    return this.serversService.create(createServerDto);
+  }
 
-    @Get()
-    findAll() {
-        return this.serversService.findAll();
-    }
+  @Get()
+  findAll() {
+    return this.serversService.findAll();
+  }
 
-    @Get(':id')
-    findOne(@Param('id') id: string) {
-        return this.serversService.findOne(id);
-    }
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.serversService.findOne(id);
+  }
 
-    @Patch(':id')
-    update(@Param('id') id: string, @Body() updateServerDto: UpdateServerDto) {
-        return this.serversService.update(id, updateServerDto);
-    }
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateServerDto: UpdateServerDto) {
+    return this.serversService.update(id, updateServerDto);
+  }
 
-    @Delete(':id')
-    @HttpCode(204)
-    remove(@Param('id') id: string) {
-        return this.serversService.remove(id);
-    }
+  @Delete(':id')
+  @HttpCode(204)
+  remove(@Param('id') id: string) {
+    return this.serversService.remove(id);
+  }
 }

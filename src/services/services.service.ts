@@ -19,12 +19,12 @@ export class ServicesService {
   private readonly logger = new Logger(ServicesService.name);
 
   constructor(
-      @InjectRepository(Service)
-      private readonly servicesRepository: Repository<Service>,
-      @InjectRepository(Plan)
-      private readonly plansRepository: Repository<Plan>,
-      private readonly ekoService: EkoService,
-      @InjectQueue('provisioning') private readonly provisioningQueue: Queue,
+    @InjectRepository(Service)
+    private readonly servicesRepository: Repository<Service>,
+    @InjectRepository(Plan)
+    private readonly plansRepository: Repository<Plan>,
+    private readonly ekoService: EkoService,
+    @InjectQueue('provisioning') private readonly provisioningQueue: Queue,
   ) {}
 
   async queueProvisioningForService(serviceId: string) {
@@ -32,9 +32,13 @@ export class ServicesService {
     if (!service) {
       throw new NotFoundException(`Usługa o ID ${serviceId} nie istnieje.`);
     }
-    this.logger.log(`[PRODUCER] Ręczne dodawanie zadania dla usługi ${serviceId} do kolejki.`);
+    this.logger.log(
+      `[PRODUCER] Ręczne dodawanie zadania dla usługi ${serviceId} do kolejki.`,
+    );
     await this.provisioningQueue.add('create-hosting-account', { serviceId });
-    return { message: `Zadanie provisioningu dla usługi ${serviceId} zostało dodane do kolejki.` };
+    return {
+      message: `Zadanie provisioningu dla usługi ${serviceId} zostało dodane do kolejki.`,
+    };
   }
 
   async create(createServiceDto: CreateServiceDto): Promise<Service> {
@@ -59,7 +63,10 @@ export class ServicesService {
   }
 
   findAllForUser(userId: string): Promise<Service[]> {
-    return this.servicesRepository.find({ where: { user: { id: userId } }, relations: ['plan'] });
+    return this.servicesRepository.find({
+      where: { user: { id: userId } },
+      relations: ['plan'],
+    });
   }
 
   async findOneForUser(id: string, userId: string): Promise<Service> {
@@ -68,7 +75,9 @@ export class ServicesService {
       relations: ['plan', 'user'],
     });
     if (!service) {
-      throw new NotFoundException(`Usługa o ID "${id}" nie została znaleziona lub nie masz do niej dostępu`);
+      throw new NotFoundException(
+        `Usługa o ID "${id}" nie została znaleziona lub nie masz do niej dostępu`,
+      );
     }
     return service;
   }
@@ -77,7 +86,10 @@ export class ServicesService {
     const service = await this.findOneForUser(id, userId);
     service.autoRenew = !service.autoRenew;
     if (service.autoRenew) {
-      this.ekoService.grantPointsForAction(userId, EkoActionType.AUTO_RENEWAL_REWARD);
+      this.ekoService.grantPointsForAction(
+        userId,
+        EkoActionType.AUTO_RENEWAL_REWARD,
+      );
     }
     return this.servicesRepository.save(service);
   }
@@ -87,14 +99,20 @@ export class ServicesService {
   }
 
   async findOne(id: string): Promise<Service> {
-    const service = await this.servicesRepository.findOne({ where: { id }, relations: ['user', 'plan'] });
+    const service = await this.servicesRepository.findOne({
+      where: { id },
+      relations: ['user', 'plan'],
+    });
     if (!service) {
       throw new NotFoundException(`Usługa o ID "${id}" nie została znaleziona`);
     }
     return service;
   }
 
-  async update(id: string, updateServiceDto: UpdateServiceDto): Promise<Service> {
+  async update(
+    id: string,
+    updateServiceDto: UpdateServiceDto,
+  ): Promise<Service> {
     const service = await this.findOne(id);
     Object.assign(service, updateServiceDto);
     return this.servicesRepository.save(service);
