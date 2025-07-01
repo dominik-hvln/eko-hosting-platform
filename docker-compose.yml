@@ -4,7 +4,7 @@ services:
     build: .
     command: npm run start:dev
     ports:
-      - "4000:4000"
+      - '4000:4000'
     volumes:
       - ./src:/usr/src/app/src
     env_file:
@@ -26,17 +26,17 @@ services:
       POSTGRES_DB: hosting_db
     ports:
       # Mapujemy port bazy danych, aby móc się do niej podłączyć z zewnątrz
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       # Ta linia gwarantuje, że dane w bazie przetrwają restart kontenera
       - postgres_data:/var/lib/postgresql/data
 
   redis:
-    image: redis:7-alpine  # Używamy lekkiego obrazu Redis
+    image: redis:7-alpine # Używamy lekkiego obrazu Redis
     container_name: redis
     restart: always
     ports:
-      - "6379:6379" # Udostępniamy port na zewnątrz (opcjonalne, ale przydatne do debugowania)
+      - '6379:6379' # Udostępniamy port na zewnątrz (opcjonalne, ale przydatne do debugowania)
     volumes:
       - redis_data:/data # Zapewnia trwałość danych Redisa
 

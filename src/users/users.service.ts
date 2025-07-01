@@ -3,7 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
-  UnauthorizedException
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,15 +17,13 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 @Injectable()
 export class UsersService {
   constructor(
-      @InjectRepository(User)
-      private usersRepository: Repository<User>,
-      @InjectRepository(Wallet)
-      private walletsRepository: Repository<Wallet>,
+    @InjectRepository(User)
+    private usersRepository: Repository<User>,
+    @InjectRepository(Wallet)
+    private walletsRepository: Repository<Wallet>,
   ) {}
 
-  async create(
-      createUserDto: CreateUserDto,
-  ): Promise<Omit<User, 'password'>> {
+  async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
     const { email, password } = createUserDto;
     const existingUser = await this.usersRepository.findOneBy({ email });
     if (existingUser) {
@@ -68,8 +66,8 @@ export class UsersService {
   }
 
   async update(
-      id: string,
-      updateUserDto: UpdateUserDto,
+    id: string,
+    updateUserDto: UpdateUserDto,
   ): Promise<Omit<User, 'password'>> {
     const user = await this.usersRepository.preload({
       id: id,
@@ -93,8 +91,8 @@ export class UsersService {
 
     // 1. Weryfikujemy, czy stare hasło podane przez użytkownika zgadza się z tym w bazie
     const isPasswordMatching = await bcrypt.compare(
-        changePasswordDto.oldPassword,
-        user.password,
+      changePasswordDto.oldPassword,
+      user.password,
     );
 
     if (!isPasswordMatching) {
@@ -103,7 +101,10 @@ export class UsersService {
 
     // 2. Hashujemy nowe hasło
     const salt = await bcrypt.genSalt();
-    const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, salt);
+    const hashedPassword = await bcrypt.hash(
+      changePasswordDto.newPassword,
+      salt,
+    );
 
     // 3. Zapisujemy nowe hasło w bazie danych
     user.password = hashedPassword;
@@ -113,7 +114,10 @@ export class UsersService {
     return { message: 'Hasło zostało pomyślnie zmienione.' };
   }
 
-  async updateProfile(userId: string, updateProfileDto: UpdateProfileDto): Promise<User> {
+  async updateProfile(
+    userId: string,
+    updateProfileDto: UpdateProfileDto,
+  ): Promise<User> {
     const user = await this.usersRepository.findOneBy({ id: userId });
     if (!user) {
       throw new NotFoundException(`User with ID "${userId}" not found`);

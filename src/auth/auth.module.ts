@@ -9,21 +9,21 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 
 @Module({
-    imports: [
-        UsersModule, // Importujemy, aby mieć dostęp do UsersService
-        PassportModule,
-        ConfigModule, // Importujemy, aby mieć dostęp do ConfigService
-        JwtModule.registerAsync({
-            imports: [ConfigModule],
-            inject: [ConfigService],
-            useFactory: async (configService: ConfigService) => ({
-                secret: configService.get<string>('JWT_SECRET'),
-                signOptions: { expiresIn: '60m' }, // Token będzie ważny przez 60 minut
-            }),
-        }),
-    ],
-    providers: [AuthService, LocalStrategy, JwtStrategy],
-    controllers: [AuthController],
-    exports: [AuthService, PassportModule],
+  imports: [
+    UsersModule, // Importujemy, aby mieć dostęp do UsersService
+    PassportModule,
+    ConfigModule, // Importujemy, aby mieć dostęp do ConfigService
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '60m' }, // Token będzie ważny przez 60 minut
+      }),
+    }),
+  ],
+  providers: [AuthService, LocalStrategy, JwtStrategy],
+  controllers: [AuthController],
+  exports: [AuthService, PassportModule],
 })
 export class AuthModule {}

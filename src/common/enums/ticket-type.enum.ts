@@ -1,5 +1,5 @@
 export enum TicketType {
-    TECHNICAL = 'technical',
-    BILLING = 'billing',
-    GENERAL = 'general',
+  TECHNICAL = 'technical',
+  BILLING = 'billing',
+  GENERAL = 'general',
 }

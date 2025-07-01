@@ -8,8 +8,8 @@ import { PaymentRequestStatus } from '../common/enums/payment-request-status.enu
 @Injectable()
 export class PaymentRequestsService {
   constructor(
-      @InjectRepository(PaymentRequest)
-      private readonly paymentRequestsRepository: Repository<PaymentRequest>,
+    @InjectRepository(PaymentRequest)
+    private readonly paymentRequestsRepository: Repository<PaymentRequest>,
   ) {}
 
   createByAdmin(createPaymentRequestDto: CreatePaymentRequestDto) {
@@ -32,7 +32,7 @@ export class PaymentRequestsService {
     // Dodajemy 'relations', aby mieć dostęp do emaila użytkownika
     const request = await this.paymentRequestsRepository.findOne({
       where: { id, user: { id: userId } },
-      relations: ['user']
+      relations: ['user'],
     });
     if (!request) {
       throw new NotFoundException(`Payment request with ID ${id} not found.`);

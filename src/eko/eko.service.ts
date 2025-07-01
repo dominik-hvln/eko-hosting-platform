@@ -1,12 +1,20 @@
 // src/eko/eko.service.ts
 
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EkoSettings } from './entities/eko-settings.entity';
 import { Repository } from 'typeorm';
 import { UpdateEkoSettingsDto } from './dto/update-eko-settings.dto';
 import { WalletService } from '../wallet/wallet.service';
-import { EkoActionHistory, EkoActionType } from './entities/eko-action-history.entity';
+import {
+  EkoActionHistory,
+  EkoActionType,
+} from './entities/eko-action-history.entity';
 
 @Injectable()
 export class EkoService {
@@ -14,11 +22,11 @@ export class EkoService {
   private readonly EKO_POINTS_PER_IMPRESSION = 0.01;
 
   constructor(
-      @InjectRepository(EkoSettings)
-      private readonly settingsRepository: Repository<EkoSettings>,
-      @InjectRepository(EkoActionHistory)
-      private readonly historyRepository: Repository<EkoActionHistory>,
-      private readonly walletService: WalletService,
+    @InjectRepository(EkoSettings)
+    private readonly settingsRepository: Repository<EkoSettings>,
+    @InjectRepository(EkoActionHistory)
+    private readonly historyRepository: Repository<EkoActionHistory>,
+    private readonly walletService: WalletService,
   ) {}
 
   async generateBadgeScript(userId: string): Promise<string> {
@@ -52,9 +60,14 @@ export class EkoService {
         `;
     } catch (error) {
       if (error instanceof NotFoundException) {
-        this.logger.warn(`Attempted to generate badge for non-existent user: ${userId}`);
+        this.logger.warn(
+          `Attempted to generate badge for non-existent user: ${userId}`,
+        );
       } else {
-        this.logger.error(`Error generating badge for user: ${userId}`, error.stack);
+        this.logger.error(
+          `Error generating badge for user: ${userId}`,
+          error.stack,
+        );
       }
       return `/* EKO-Hosting: Użytkownik nie został znaleziony. */`;
     }
@@ -62,10 +75,17 @@ export class EkoService {
 
   async grantPointsForBadgeImpression(userId: string): Promise<void> {
     try {
-      await this.walletService.addEkoPoints(userId, this.EKO_POINTS_PER_IMPRESSION);
-      this.logger.log(`Granted ${this.EKO_POINTS_PER_IMPRESSION} EKO points to user ${userId} for a dark mode badge impression.`);
+      await this.walletService.addEkoPoints(
+        userId,
+        this.EKO_POINTS_PER_IMPRESSION,
+      );
+      this.logger.log(
+        `Granted ${this.EKO_POINTS_PER_IMPRESSION} EKO points to user ${userId} for a dark mode badge impression.`,
+      );
     } catch (error) {
-      this.logger.warn(`Could not grant points for badge impression to user ${userId}: ${error.message}`);
+      this.logger.warn(
+        `Could not grant points for badge impression to user ${userId}: ${error.message}`,
+      );
     }
   }
 
@@ -96,7 +116,11 @@ export class EkoService {
     }
 
     const creditAmount = pointsToRedeem / settings.pointsPerPln;
-    return this.walletService.handleEkoRedemption(userId, pointsToRedeem, creditAmount);
+    return this.walletService.handleEkoRedemption(
+      userId,
+      pointsToRedeem,
+      creditAmount,
+    );
   }
 
   async getSummaryForUser(userId: string) {
@@ -107,9 +131,15 @@ export class EkoService {
       order: { createdAt: 'DESC' },
       take: 10,
     });
-    const treesPlanted = Math.floor(parseFloat(wallet.lifetimeEkoPoints.toString()) / settings.pointsToPlantTree);
-    const pointsTowardsNextTree = parseFloat(wallet.lifetimeEkoPoints.toString()) % settings.pointsToPlantTree;
-    const progressToNextTree = (pointsTowardsNextTree / settings.pointsToPlantTree) * 100;
+    const treesPlanted = Math.floor(
+      parseFloat(wallet.lifetimeEkoPoints.toString()) /
+        settings.pointsToPlantTree,
+    );
+    const pointsTowardsNextTree =
+      parseFloat(wallet.lifetimeEkoPoints.toString()) %
+      settings.pointsToPlantTree;
+    const progressToNextTree =
+      (pointsTowardsNextTree / settings.pointsToPlantTree) * 100;
 
     let currentTreeStage = 1;
     if (progressToNextTree >= 75) {
@@ -131,14 +161,18 @@ export class EkoService {
   }
 
   async grantPointsForAction(userId: string, actionType: EkoActionType) {
-    this.logger.log(`Attempting to grant points for action ${actionType} to user ${userId}`);
+    this.logger.log(
+      `Attempting to grant points for action ${actionType} to user ${userId}`,
+    );
 
     const existingAction = await this.historyRepository.findOneBy({
       user: { id: userId },
       actionType: actionType,
     });
     if (existingAction) {
-      this.logger.log(`User ${userId} already received points for ${actionType}.`);
+      this.logger.log(
+        `User ${userId} already received points for ${actionType}.`,
+      );
       return;
     }
 
@@ -168,6 +202,8 @@ export class EkoService {
     await this.historyRepository.save(historyEntry);
     // ----------------
 
-    this.logger.log(`Granted ${pointsToGrant} EKO points to user ${userId} for action ${actionType}`);
+    this.logger.log(
+      `Granted ${pointsToGrant} EKO points to user ${userId} for action ${actionType}`,
+    );
   }
 }

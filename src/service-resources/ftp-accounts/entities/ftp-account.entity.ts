@@ -5,19 +5,21 @@ import { Exclude } from 'class-transformer';
 
 @Entity({ name: 'ftp_accounts' })
 export class FtpAccount {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-    @Column({ unique: true })
-    username: string;
+  @Column({ unique: true })
+  username: string;
 
-    @Exclude()
-    @Column({ type: 'text' }) // Szyfrowane
-    password: string;
+  @Exclude()
+  @Column({ type: 'text' }) // Szyfrowane
+  password: string;
 
-    @Column()
-    path: string;
+  @Column()
+  path: string;
 
-    @ManyToOne(() => Service, (service) => service.ftpAccounts, { onDelete: 'CASCADE' })
-    service: Service;
+  @ManyToOne(() => Service, (service) => service.ftpAccounts, {
+    onDelete: 'CASCADE',
+  })
+  service: Service;
 }

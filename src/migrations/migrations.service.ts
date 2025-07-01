@@ -8,22 +8,22 @@ import { EncryptionService } from '../common/encryption/encryption.service';
 @Injectable()
 export class MigrationsService {
   constructor(
-      @InjectRepository(MigrationRequest)
-      private readonly migrationsRepository: Repository<MigrationRequest>,
-      private readonly encryptionService: EncryptionService,
+    @InjectRepository(MigrationRequest)
+    private readonly migrationsRepository: Repository<MigrationRequest>,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
   async create(
-      createMigrationDto: CreateMigrationDto,
-      userId: string,
+    createMigrationDto: CreateMigrationDto,
+    userId: string,
   ): Promise<MigrationRequest> {
     // Szyfrujemy hasła przed utworzeniem obiektu
     const encryptedFtpPassword = this.encryptionService.encrypt(
-        createMigrationDto.ftpPassword,
+      createMigrationDto.ftpPassword,
     );
     const encryptedMysqlPassword = createMigrationDto.mysqlPassword
-        ? this.encryptionService.encrypt(createMigrationDto.mysqlPassword)
-        : null;
+      ? this.encryptionService.encrypt(createMigrationDto.mysqlPassword)
+      : null;
 
     const newMigrationRequest = this.migrationsRepository.create({
       ...createMigrationDto,
