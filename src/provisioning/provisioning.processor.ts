@@ -106,6 +106,12 @@ export class ProvisioningProcessor extends WorkerHost {
         child.stderr.on('data', (data: Buffer) => {
           this.logger.warn(`Ansible STDERR: ${data.toString()}`.trim());
         });
+        child.on('error', (err) => {
+          this.logger.error(
+            `Nie można uruchomić ansible-playbook: ${err.message}`,
+          );
+          reject(err);
+        });
         child.on('close', (code) => {
           if (code === 0) {
             resolve();
