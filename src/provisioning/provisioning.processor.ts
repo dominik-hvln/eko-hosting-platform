@@ -95,11 +95,12 @@ export class ProvisioningProcessor extends WorkerHost {
       `ansible_ssh_common_args='-o StrictHostKeyChecking=no' mysql_root_password='${rootPassword}'`,
     ];
 
-    this.logger.log(`Uruchamiam komendę Ansible...`);
+    const ansibleCmd = '/usr/bin/ansible-playbook';
+    this.logger.log(`Uruchamiam komendę ${ansibleCmd} z argumentami: ${args.join(' ')}`);
 
     try {
       await new Promise<void>((resolve, reject) => {
-        const child = spawn('ansible-playbook', args);
+        const child = spawn(ansibleCmd, args);
         child.stdout.on('data', (data: Buffer) => {
           this.logger.log(`Ansible STDOUT: ${data.toString()}`.trim());
         });
