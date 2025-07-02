@@ -40,11 +40,11 @@ export class EmailAccountsService {
       serviceId,
       userId,
     );
-    const password = crypto.randomBytes(12).toString('hex');
+    const generatedPassword = crypto.randomBytes(12).toString('hex');
     const emailAccount = this.emailAccountsRepository.create({
       emailAddress: dto.emailAddress,
       quotaMb: dto.quotaMb ?? 1024,
-      password: this.encryptionService.encrypt(password),
+      password: this.encryptionService.encrypt(generatedPassword),
       service,
       domain: { id: domainId } as any,
     });
@@ -52,8 +52,7 @@ export class EmailAccountsService {
     this.logger.log(
       `Utworzono konto e-mail ${saved.emailAddress} dla usługi ${serviceId}`,
     );
-    const { password, ...rest } = saved;
-    void password;
+    const { password: _ignored, ...rest } = saved;
     return rest;
   }
 

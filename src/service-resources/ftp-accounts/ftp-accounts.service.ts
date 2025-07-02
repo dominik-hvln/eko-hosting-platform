@@ -38,19 +38,18 @@ export class FtpAccountsService {
       serviceId,
       userId,
     );
-    const password = crypto.randomBytes(12).toString('hex');
+    const generatedPassword = crypto.randomBytes(12).toString('hex');
     const ftpAccount = this.ftpAccountsRepository.create({
       username: createDto.username,
       path: createDto.path,
-      password: this.encryptionService.encrypt(password),
+      password: this.encryptionService.encrypt(generatedPassword),
       service,
     });
     const saved = await this.ftpAccountsRepository.save(ftpAccount);
     this.logger.log(
       `Utworzono konto FTP ${saved.username} dla usługi ${serviceId}`,
     );
-    const { password, ...rest } = saved;
-    void password;
+    const { password: _ignored, ...rest } = saved;
     return rest;
   }
 
