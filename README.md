@@ -85,7 +85,10 @@ mysql_root_password: <your-production-password>
 ```
 
 Encrypt the file with `ansible-vault` if necessary. During deployment Ansible
-will read the variable automatically.
+will read the variable automatically. The backend expects the `ansible-playbook`
+binary to be available (in Docker images it lives under `/usr/bin/ansible-playbook`).
+Streaming output from the playbook is forwarded by the backend worker, so you can monitor provisioning progress in real time.
+After completion the API returns a short message confirming success.
 
 ## Resources
 
