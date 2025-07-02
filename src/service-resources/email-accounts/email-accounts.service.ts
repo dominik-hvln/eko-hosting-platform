@@ -52,7 +52,8 @@ export class EmailAccountsService {
     this.logger.log(
       `Utworzono konto e-mail ${saved.emailAddress} dla usługi ${serviceId}`,
     );
-    const { password: _p, ...rest } = saved;
+    const { password, ...rest } = saved;
+    void password;
     return rest;
   }
 

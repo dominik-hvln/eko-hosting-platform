@@ -49,7 +49,8 @@ export class FtpAccountsService {
     this.logger.log(
       `Utworzono konto FTP ${saved.username} dla usługi ${serviceId}`,
     );
-    const { password: _p, ...rest } = saved;
+    const { password, ...rest } = saved;
+    void password;
     return rest;
   }
 

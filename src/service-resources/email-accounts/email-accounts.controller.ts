@@ -22,7 +22,7 @@ export class EmailAccountsController {
     @Param('serviceId') serviceId: string,
     @Param('domainId') domainId: string,
     @Body() dto: CreateEmailAccountDto,
-    @Request() req,
+    @Request() req: { user: { userId: string } },
   ) {
     return this.emailAccountsService.create(
       dto,
@@ -33,7 +33,10 @@ export class EmailAccountsController {
   }
 
   @Get()
-  findAll(@Param('serviceId') serviceId: string, @Request() req) {
+  findAll(
+    @Param('serviceId') serviceId: string,
+    @Request() req: { user: { userId: string } },
+  ) {
     return this.emailAccountsService.findAllForService(
       serviceId,
       req.user.userId,
@@ -44,7 +47,7 @@ export class EmailAccountsController {
   remove(
     @Param('serviceId') serviceId: string,
     @Param('id') id: string,
-    @Request() req,
+    @Request() req: { user: { userId: string } },
   ) {
     return this.emailAccountsService.remove(id, serviceId, req.user.userId);
   }

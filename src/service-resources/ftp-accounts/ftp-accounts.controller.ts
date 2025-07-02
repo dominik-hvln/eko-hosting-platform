@@ -21,13 +21,16 @@ export class FtpAccountsController {
   create(
     @Param('serviceId') serviceId: string,
     @Body() dto: CreateFtpAccountDto,
-    @Request() req,
+    @Request() req: { user: { userId: string } },
   ) {
     return this.ftpAccountsService.create(dto, serviceId, req.user.userId);
   }
 
   @Get()
-  findAll(@Param('serviceId') serviceId: string, @Request() req) {
+  findAll(
+    @Param('serviceId') serviceId: string,
+    @Request() req: { user: { userId: string } },
+  ) {
     return this.ftpAccountsService.findAllForService(
       serviceId,
       req.user.userId,
@@ -38,7 +41,7 @@ export class FtpAccountsController {
   remove(
     @Param('serviceId') serviceId: string,
     @Param('id') id: string,
-    @Request() req,
+    @Request() req: { user: { userId: string } },
   ) {
     return this.ftpAccountsService.remove(id, serviceId, req.user.userId);
   }
