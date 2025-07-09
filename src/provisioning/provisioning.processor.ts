@@ -23,23 +23,23 @@ export class ProvisioningProcessor extends WorkerHost {
   private readonly logger = new Logger(ProvisioningProcessor.name);
 
   constructor(
-    private readonly serversService: ServersService,
-    private readonly encryptionService: EncryptionService,
-    @InjectRepository(Service)
-    private readonly servicesRepository: Repository<Service>,
-    @InjectRepository(Server)
-    private readonly serversRepository: Repository<Server>,
-    @InjectRepository(Domain)
-    private readonly domainsRepository: Repository<Domain>,
-    @InjectRepository(Database)
-    private readonly databasesRepository: Repository<Database>,
+      private readonly serversService: ServersService,
+      private readonly encryptionService: EncryptionService,
+      @InjectRepository(Service)
+      private readonly servicesRepository: Repository<Service>,
+      @InjectRepository(Server)
+      private readonly serversRepository: Repository<Server>,
+      @InjectRepository(Domain)
+      private readonly domainsRepository: Repository<Domain>,
+      @InjectRepository(Database)
+      private readonly databasesRepository: Repository<Database>,
   ) {
     super();
   }
 
   async process(job: Job<any, any, string>): Promise<any> {
     this.logger.log(
-      `[WORKER] Otrzymano zadanie [${job.id}] o nazwie: ${job.name}`,
+        `[WORKER] Otrzymano zadanie [${job.id}] o nazwie: ${job.name}`,
     );
 
     switch (job.name) {
@@ -65,53 +65,72 @@ export class ProvisioningProcessor extends WorkerHost {
     const { serverId, rootPassword } = job.data;
     this.logger.log(`Rozpoczynam provisioning dla serwera: ${serverId}`);
 
-    const server = await this.serversService.findOne(serverId);
-    if (!server) throw new Error(`Serwer o ID ${serverId} nie istnieje.`);
 
-    const serverToUpdate = await this.serversRepository.findOneBy({
-      id: serverId,
-    });
+    const server = await this.serversService.findOneRaw(serverId);
+    if (!server) {
+      this.logger.error(`Serwer o ID ${serverId} nie został znaleziony w bazie danych.`);
+      throw new Error(`Serwer o ID ${serverId} nie istnieje.`);
+    }
+
+    const serverToUpdate = await this.serversRepository.findOneBy({ id: serverId });
     if (serverToUpdate) {
       serverToUpdate.status = ServerStatus.PROVISIONING;
       await this.serversRepository.save(serverToUpdate);
     }
 
     const keyPath = path.join('/tmp', `ssh_key_${serverId}`);
-    const decryptedKey = this.encryptionService.decrypt(server.sshPrivateKey);
-    fs.writeFileSync(keyPath, decryptedKey);
-    fs.chmodSync(keyPath, '600');
-
-    const playbookPath = path.resolve(process.cwd(), 'ansible/playbook.yml');
-    const args = [
-      '-vvv',
-      playbookPath,
-      '-i',
-      `${server.ipAddress},`,
-      '--user',
-      server.sshUser,
-      '--private-key',
-      keyPath,
-      '--extra-vars',
-      `ansible_ssh_common_args='-o StrictHostKeyChecking=no' mysql_root_password='${rootPassword}'`,
-    ];
-
-    this.logger.log(`Uruchamiam komendę Ansible...`);
 
     try {
+      this.logger.log(`Deszyfrowanie klucza SSH dla serwera ${serverId}...`);
+      const decryptedKey = this.encryptionService.decrypt(server.sshPrivateKey);
+
+      this.logger.log(`Zapisywanie klucza SSH do tymczasowego pliku: ${keyPath}`);
+      fs.writeFileSync(keyPath, decryptedKey);
+
+      this.logger.log(`Ustawianie uprawnień 600 dla pliku ${keyPath}`);
+      fs.chmodSync(keyPath, '600');
+
+      const playbookPath = path.resolve(process.cwd(), 'ansible/playbook.yml');
+      this.logger.log(`Ścieżka do playbooka Ansible: ${playbookPath}`);
+
+      if (!fs.existsSync(playbookPath)) {
+        throw new Error(`Plik playbooka Ansible nie został znaleziony pod ścieżką: ${playbookPath}`);
+      }
+
+      const args = [
+        '-vvv',
+        playbookPath,
+        '-i',
+        `${server.ipAddress},`,
+        '--user',
+        server.sshUser,
+        '--private-key',
+        keyPath,
+        '--extra-vars',
+        `ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' mysql_root_password='${rootPassword}'`,
+      ];
+
+      this.logger.log(`Uruchamiam komendę Ansible z argumentami: ${args.join(' ')}`);
+
       await new Promise<void>((resolve, reject) => {
         const child = spawn('ansible-playbook', args);
         child.stdout.on('data', (data: Buffer) => {
-          this.logger.log(`Ansible STDOUT: ${data.toString()}`.trim());
+          this.logger.log(`[Ansible STDOUT]: ${data.toString().trim()}`);
         });
         child.stderr.on('data', (data: Buffer) => {
-          this.logger.warn(`Ansible STDERR: ${data.toString()}`.trim());
+          this.logger.warn(`[Ansible STDERR]: ${data.toString().trim()}`);
         });
         child.on('close', (code) => {
           if (code === 0) {
+            this.logger.log(`Proces Ansible dla serwera ${serverId} zakończył się sukcesem (kod 0).`);
             resolve();
           } else {
-            reject(new Error(`Proces zakończył się kodem ${code}`));
+            reject(new Error(`Proces Ansible zakończył się błędem (kod ${code})`));
           }
+        });
+        child.on('error', (err) => {
+          this.logger.error(`Błąd uruchomienia procesu Ansible: ${err.message}`);
+          reject(err);
         });
       });
 
@@ -119,22 +138,22 @@ export class ProvisioningProcessor extends WorkerHost {
         serverToUpdate.status = ServerStatus.ONLINE;
         await this.serversRepository.save(serverToUpdate);
       }
-      this.logger.log(`Provisioning serwera ${serverId} zakończony sukcesem.`);
+      this.logger.log(`Provisioning serwera ${serverId} zakończony pomyślnie.`);
+
     } catch (error) {
+      this.logger.error(`KRYTYCZNY BŁĄD podczas provisioningu serwera ${serverId}:`, error.stack);
       if (serverToUpdate) {
         serverToUpdate.status = ServerStatus.ERROR;
         await this.serversRepository.save(serverToUpdate);
       }
-      this.logger.error(
-        `Provisioning serwera ${serverId} zakończył się błędem.`,
-        error,
-      );
       throw error;
     } finally {
+      this.logger.log(`Sprzątanie po provisioningu - usuwanie pliku klucza: ${keyPath}`);
       if (fs.existsSync(keyPath)) {
         fs.unlinkSync(keyPath);
       }
     }
+
     return {
       done: true,
       serverId: server.id,
@@ -145,7 +164,7 @@ export class ProvisioningProcessor extends WorkerHost {
   private async handleCreateHostingAccount(job: Job) {
     const { serviceId } = job.data;
     this.logger.log(
-      `Rozpoczynam logikę dla 'create-hosting-account', usługa: ${serviceId}`,
+        `Rozpoczynam logikę dla 'create-hosting-account', usługa: ${serviceId}`,
     );
 
     const service = await this.servicesRepository.findOne({
@@ -156,14 +175,14 @@ export class ProvisioningProcessor extends WorkerHost {
 
     const server = await this.serversService.findLeastLoadedServer();
     this.logger.log(
-      `Wybrano serwer: ${server.name} (${server.ipAddress}) dla usługi ${serviceId}`,
+        `Wybrano serwer: ${server.name} (${server.ipAddress}) dla usługi ${serviceId}`,
     );
 
     const username =
-      `${service.user.email.split('@')[0]}${Math.floor(Math.random() * 1000)}`.replace(
-        /[^a-zA-Z0-9]/g,
-        '',
-      );
+        `${service.user.email.split('@')[0]}${Math.floor(Math.random() * 1000)}`.replace(
+            /[^a-zA-Z0-9]/g,
+            '',
+        );
     const command = `/usr/local/bin/create_account.sh ${username}`;
 
     await this.executeRemoteScript(server, command);
@@ -177,7 +196,7 @@ export class ProvisioningProcessor extends WorkerHost {
     await this.serversRepository.save(server);
 
     this.logger.log(
-      `[WORKER] Zakończono przetwarzanie zadania [${job.id}] dla usługi: ${serviceId}`,
+        `[WORKER] Zakończono przetwarzanie zadania [${job.id}] dla usługi: ${serviceId}`,
     );
     return { done: true, serverId: server.id, username };
   }
@@ -195,14 +214,14 @@ export class ProvisioningProcessor extends WorkerHost {
     });
 
     this.logger.log(
-      `Wykonywanie komendy na serwerze ${server.name}: ${command}`,
+        `Wykonywanie komendy na serwerze ${server.name}: ${command}`,
     );
     const result = await ssh.execCommand(command);
     ssh.dispose();
 
     if (result.code !== 0) {
       this.logger.error(
-        `Błąd skryptu na serwerze ${server.name}: ${result.stderr}`,
+          `Błąd skryptu na serwerze ${server.name}: ${result.stderr}`,
       );
       throw new Error(`Błąd wykonywania skryptu na serwerze: ${result.stderr}`);
     }
@@ -218,7 +237,7 @@ export class ProvisioningProcessor extends WorkerHost {
     });
     if (!service || !service.provisionedOnServer) {
       throw new Error(
-        `Nie można wykonać operacji, usługa ${serviceId} nie ma przypisanego serwera.`,
+          `Nie można wykonać operacji, usługa ${serviceId} nie ma przypisanego serwera.`,
       );
     }
     return service.provisionedOnServer;
@@ -244,7 +263,7 @@ export class ProvisioningProcessor extends WorkerHost {
     });
     if (!domain || !domain.service || !domain.service.provisionedOnServer) {
       throw new Error(
-        `Nie można utworzyć domeny, brak powiązanej usługi lub serwera.`,
+          `Nie można utworzyć domeny, brak powiązanej usługi lub serwera.`,
       );
     }
 
@@ -264,7 +283,7 @@ export class ProvisioningProcessor extends WorkerHost {
     });
     if (!domain || !domain.service || !domain.service.provisionedOnServer) {
       throw new Error(
-        `Nie można zmienić wersji PHP, brak powiązanej usługi lub serwera.`,
+          `Nie można zmienić wersji PHP, brak powiązanej usługi lub serwera.`,
       );
     }
 

@@ -1,145 +1,123 @@
----
-- hosts: all
+- name: Pełny provisioning serwera hostingowego
+  hosts: all
   become: yes
   vars:
     php_versions:
-      - '8.2'
-      - '8.1'
-      - '7.4'
-  environment:
-    DEBIAN_FRONTEND: noninteractive
+      - "8.2"
+      - "8.1"
+      - "7.4"
 
   tasks:
-    - name: 1. Konfiguracja Systemu Podstawowego
-      block:
-        - name: Dodaj repozytorium PPA dla PHP (ondrej/php)
-          ansible.builtin.apt_repository:
-            repo: ppa:ondrej/php
-            state: present
-            update_cache: yes
+    - name: Zaktualizuj cache apt i zainstaluj podstawowe pakiety
+      ansible.builtin.apt:
+        name:
+          - software-properties-common
+          - ufw
+        update_cache: yes
 
-        - name: Zaktualizuj wszystkie pakiety systemowe
-          ansible.builtin.apt:
-            upgrade: dist
-            update_cache: yes
+    - name: Dodaj repozytorium PPA dla PHP
+      ansible.builtin.apt_repository:
+        repo: "ppa:ondrej/php"
+        state: present
 
-    - name: 2. Instalacja Kluczowych Usług (WWW, Baza Danych, FTP, Poczta)
-      block:
-        - name: Wstępna konfiguracja Postfix by uniknąć interaktywnych pytań
-          ansible.builtin.debconf:
-            name: postfix
-            question: '{{ item.question }}'
-            value: '{{ item.value }}'
-            vtype: string
-          loop:
-            - { question: 'postfix/main_mailer_type', value: 'Internet Site' }
-            - { question: 'postfix/mailname', value: '{{ inventory_hostname }}' }
-        - name: Zainstaluj Nginx, MariaDB, Serwer FTP i inne narzędzia
-          ansible.builtin.apt:
-            name:
-              - nginx
-              - mariadb-server
-              - python3-pymysql # Wymagane przez moduły Ansible dla MariaDB
-              - vsftpd
-              - ufw # Prosty firewall
-            state: latest
+    - name: Zainstaluj cały stos oprogramowania
+      ansible.builtin.apt:
+        name: "{{ item }}"
+        state: latest
+        update_cache: yes
+      loop:
+        - nginx
+        - mariadb-server
+        - vsftpd
+        - postfix
+        - dovecot-core
+        - dovecot-imapd
+        - dovecot-pop3d
+        - python3-pymysql
+        - "php{{ item }}-fpm"
+        - "php{{ item }}-mysql"
+        - "php{{ item }}-cli"
+        - "php{{ item }}-curl"
+        - "php{{ item }}-gd"
+        - "php{{ item }}-zip"
+        - "php{{ item }}-mbstring"
+        - "php{{ item }}-xml"
 
-        - name: Zainstaluj kompletny stos pocztowy (Postfix, Dovecot)
-          ansible.builtin.apt:
-            name:
-              - postfix
-              - dovecot-core
-              - dovecot-imapd
-              - dovecot-pop3d
-            state: latest
+    - name: Upewnij się, że usługa MariaDB jest uruchomiona
+      ansible.builtin.service:
+        name: mariadb
+        state: started
+        enabled: yes
 
-        - name: Skopiuj skrypt do tworzenia kont hostingowych
-          ansible.builtin.copy:
-            src: '{{ playbook_dir }}/scripts/create_account.sh'
-            dest: /usr/local/bin/create_account.sh
-            mode: '0755'
-        - name: Skopiuj skrypt do zarządzania domenami
-          ansible.builtin.copy:
-            src: '{{ playbook_dir }}/scripts/manage_domain.sh'
-            dest: /usr/local/bin/manage_domain.sh
-            mode: '0755'
-        - name: Skopiuj skrypt do zarządzania bazami danych
-          ansible.builtin.copy:
-            src: '{{ playbook_dir }}/scripts/manage_database.sh'
-            dest: /usr/local/bin/manage_database.sh
-            mode: '0755'
+    # --- NOWA, NIEZAWODNA STRATEGIA DLA MARIADB ---
+    - name: Zabezpiecz instalację MariaDB i ustaw hasło roota
+      community.mysql.mysql_secure_installation:
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        use_default_password: yes
+        new_password: "{{ mysql_root_password }}"
+        new_password_again: "{{ mysql_root_password }}"
+        remove_anonymous_users: yes
+        remove_test_database: yes
+        disallow_root_login_remotely: yes
+        reload_privilege_tables: yes
+      no_log: true
 
-    - name: 3. Instalacja Wielu Wersji PHP i Modułów
-      block:
-        - name: Zainstaluj wiele wersji PHP-FPM oraz popularne rozszerzenia
-          ansible.builtin.apt:
-            name:
-              - 'php{{ item }}-fpm'
-              - 'php{{ item }}-mysql'
-              - 'php{{ item }}-cli'
-              - 'php{{ item }}-curl'
-              - 'php{{ item }}-gd'
-              - 'php{{ item }}-zip'
-              - 'php{{ item }}-mbstring'
-              - 'php{{ item }}-xml'
-            state: present
-          loop: '{{ php_versions }}'
+    - name: Utwórz plik .my.cnf dla roota z nowym hasłem
+      ansible.builtin.template:
+        dest: /root/.my.cnf
+        mode: '0600'
+        content: |
+          [client]
+          user=root
+          password={{ mysql_root_password }}
+      no_log: true
+    # --- KONIEC NOWEJ STRATEGII ---
 
-    - name: 4. Hardening i Konfiguracja Usług
-      block:
-        - name: Ustaw hasło roota dla MariaDB
-          community.mysql.mysql_user:
-            name: root
-            host: localhost
-            password: '{{ mysql_root_password }}'
-            login_unix_socket: /var/run/mysqld/mysqld.sock
-            check_implicit_admin: yes
+    - name: Skopiuj skrypty pomocnicze
+      ansible.builtin.copy:
+        src: "scripts/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        mode: '0755'
+      loop:
+        - create_account.sh
+        - manage_domain.sh
+        - manage_database.sh
 
-        - name: Usuń anonimowych użytkowników MariaDB
-          community.mysql.mysql_user:
-            name: ''
-            host: localhost
-            state: absent
-            login_unix_socket: /var/run/mysqld/mysqld.sock
+    - name: Skonfiguruj zaporę UFW
+      community.general.ufw:
+        rule: "{{ item.rule }}"
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+      loop:
+        - { rule: 'allow', port: 'ssh', proto: 'tcp' }
+        - { rule: 'allow', port: 'http', proto: 'tcp' }
+        - { rule: 'allow', port: 'https', proto: 'tcp' }
+        - { rule: 'allow', port: '20', proto: 'tcp' }
+        - { rule: 'allow', port: '21', proto: 'tcp' }
+        - { rule: 'allow', port: '143', proto: 'tcp' }  # IMAP
+        - { rule: 'allow', port: '993', proto: 'tcp' }  # IMAPS
+        - { rule: 'allow', port: '110', proto: 'tcp' }  # POP3
+        - { rule: 'allow', port: '995', proto: 'tcp' }  # POP3S
+        - { rule: 'allow', port: '25', proto: 'tcp' }   # SMTP
+        - { rule: 'allow', port: '587', proto: 'tcp' }  # SMTP Submission
+        - { rule: 'allow', port: '465', proto: 'tcp' }  # SMTPS
 
-        - name: Usuń testową bazę danych
-          community.mysql.mysql_db:
-            name: test
-            state: absent
-            login_unix_socket: /var/run/mysqld/mysqld.sock
+    - name: Włącz UFW
+      community.general.ufw:
+        state: enabled
+        policy: deny
 
-        - name: Skonfiguruj firewall (UFW)
-          community.general.ufw:
-            rule: allow
-            port: '{{ item }}'
-          loop:
-            - 'ssh'
-            - 'http'
-            - 'https'
-            - '21/tcp' # FTP
-            - '25/tcp' # SMTP
-            - '143/tcp' # IMAP
-            - '993/tcp' # IMAPS
-            - '110/tcp' # POP3
-            - '995/tcp' # POP3S
-        - name: Włącz firewall UFW
-          community.general.ufw:
-            state: enabled
-
-    - name: 5. Uruchomienie i Włączenie Usług
-      block:
-        - name: Upewnij się, że wszystkie kluczowe usługi są uruchomione i włączone
-          ansible.builtin.service:
-            name: '{{ item }}'
-            state: started
-            enabled: yes
-          loop:
-            - nginx
-            - mariadb
-            - vsftpd
-            - postfix
-            - dovecot
-            - 'php8.2-fpm'
-            - 'php8.1-fpm'
-            - 'php7.4-fpm'
-            - ufw
+    - name: Upewnij się, że kluczowe usługi są uruchomione i włączone przy starcie
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - nginx
+        - mariadb
+        - vsftpd
+        - "php8.2-fpm"
+        - "php8.1-fpm"
+        - "php7.4-fpm"
+        - postfix
+        - dovecot

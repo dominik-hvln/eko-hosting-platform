@@ -12,6 +12,7 @@ FROM node:20-alpine
 WORKDIR /usr/src/app
 
 RUN apk add --no-cache ansible openssh-client
+RUN ansible-galaxy collection install community.mysql
 
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/dist ./dist

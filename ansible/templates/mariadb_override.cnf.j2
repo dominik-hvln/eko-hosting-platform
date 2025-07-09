@@ -1,0 +1,7 @@
+[mysqld]
+# Ta linia wyłącza problematyczną wtyczkę uwierzytelniania przez socket
+skip-unix-socket
+
+[client-mariadb]
+# Ta linia zapewnia, że klient również nie będzie próbował używać socketu
+skip-unix-socket

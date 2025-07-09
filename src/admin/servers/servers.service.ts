@@ -1,3 +1,5 @@
+// src/admin/servers/servers.service.ts
+
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,50 +15,51 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class ServersService {
-  private readonly logger = new Logger(ServersService.name);
+    private readonly logger = new Logger(ServersService.name);
 
-  constructor(
-    @InjectRepository(Server)
-    private readonly serversRepository: Repository<Server>,
-    private readonly encryptionService: EncryptionService,
-    @InjectQueue('provisioning') private readonly provisioningQueue: Queue,
-  ) {}
+    constructor(
+        @InjectRepository(Server)
+        private readonly serversRepository: Repository<Server>,
+        private readonly encryptionService: EncryptionService,
+        @InjectQueue('provisioning') private readonly provisioningQueue: Queue,
+    ) {}
 
-  private async findServerById(id: string): Promise<Server> {
-    const server = await this.serversRepository.findOneBy({ id });
-    if (!server) {
-      throw new NotFoundException(`Serwer o ID ${id} nie został znaleziony.`);
+    private async findServerById(id: string): Promise<Server> {
+        const server = await this.serversRepository.findOneBy({ id });
+        if (!server) {
+            throw new NotFoundException(`Serwer o ID ${id} nie został znaleziony.`);
+        }
+        return server;
     }
-    return server;
-  }
+
+    async findOneRaw(id: string): Promise<Server> {
+        return this.findServerById(id);
+    }
 
     async queueServerProvisioning(serverId: string) {
-        const server = await this.serversRepository.findOneBy({ id: serverId });
+        // Używamy findOneRaw, żeby nie deszyfrować klucza bez potrzeby
+        const server = await this.findOneRaw(serverId);
         if (!server) {
             throw new NotFoundException(`Serwer o ID ${serverId} nie istnieje.`);
         }
-
-        // Generujemy hasło roota i zapisujemy je (zaszyfrowane) przed dodaniem zadania do kolejki
         const rootPassword = crypto.randomBytes(16).toString('hex');
         server.mysqlRootPassword = this.encryptionService.encrypt(rootPassword);
         await this.serversRepository.save(server);
-
         this.logger.log(`[PRODUCER] Zlecanie zadania 'provision-server' dla serwera ${serverId}`);
         await this.provisioningQueue.add('provision-server', { serverId: serverId, rootPassword: rootPassword });
-
         return { message: `Zadanie provisioningu dla serwera ${serverId} zostało dodane do kolejki.` };
     }
 
-  async findLeastLoadedServer(): Promise<Server> {
-    const server = await this.serversRepository.findOne({
-      where: { status: ServerStatus.ONLINE },
-      order: { loadIndex: 'ASC' },
-    });
-    if (!server) {
-      throw new Error('Brak dostępnych serwerów online do provisioningu.');
+    async findLeastLoadedServer(): Promise<Server> {
+        const server = await this.serversRepository.findOne({
+            where: { status: ServerStatus.ONLINE },
+            order: { loadIndex: 'ASC' },
+        });
+        if (!server) {
+            throw new Error('Brak dostępnych serwerów online do provisioningu.');
+        }
+        return server;
     }
-    return server;
-  }
 
     async testConnection(id: string): Promise<{ success: boolean; message: string; output?: string }> {
         const server = await this.findServerById(id);
@@ -79,8 +82,8 @@ export class ServersService {
                 readyTimeout: 10000,
             });
 
-      const result = await ssh.execCommand('df -h /');
-      ssh.dispose();
+            const result = await ssh.execCommand('df -h /');
+            ssh.dispose();
 
             if (result.code === 0) {
                 server.status = ServerStatus.ONLINE;
@@ -97,33 +100,33 @@ export class ServersService {
         }
     }
 
-  async create(createServerDto: CreateServerDto): Promise<Server> {
-    const encryptedKey = this.encryptionService.encrypt(
-      createServerDto.sshPrivateKey,
-    );
-    const serverData = {
-      ...createServerDto,
-      sshPrivateKey: encryptedKey,
-      status: ServerStatus.OFFLINE,
-    };
-    const newServer = this.serversRepository.create(serverData);
-    return this.serversRepository.save(newServer);
-  }
+    async create(createServerDto: CreateServerDto): Promise<Server> {
+        const encryptedKey = this.encryptionService.encrypt(
+            createServerDto.sshPrivateKey,
+        );
+        const serverData = {
+            ...createServerDto,
+            sshPrivateKey: encryptedKey,
+            status: ServerStatus.OFFLINE,
+        };
+        const newServer = this.serversRepository.create(serverData);
+        return this.serversRepository.save(newServer);
+    }
 
-  async findAll(): Promise<Server[]> {
-    return this.serversRepository.find({
-      select: [
-        'id',
-        'name',
-        'ipAddress',
-        'sshPort',
-        'sshUser',
-        'status',
-        'loadIndex',
-        'createdAt',
-      ],
-    });
-  }
+    async findAll(): Promise<Server[]> {
+        return this.serversRepository.find({
+            select: [
+                'id',
+                'name',
+                'ipAddress',
+                'sshPort',
+                'sshUser',
+                'status',
+                'loadIndex',
+                'createdAt',
+            ],
+        });
+    }
 
     async findOne(id: string): Promise<Server> {
         const server = await this.findServerById(id);
@@ -136,32 +139,43 @@ export class ServersService {
         return server;
     }
 
-  async update(id: string, updateServerDto: UpdateServerDto): Promise<Server> {
-    if (
-      updateServerDto.sshPrivateKey &&
-      updateServerDto.sshPrivateKey.trim() !== '' &&
-      !updateServerDto.sshPrivateKey.startsWith('BŁĄD')
-    ) {
-      updateServerDto.sshPrivateKey = this.encryptionService.encrypt(
-        updateServerDto.sshPrivateKey,
-      );
-    } else {
-      delete updateServerDto.sshPrivateKey;
-    }
-    const server = await this.serversRepository.preload({
-      id: id,
-      ...updateServerDto,
-    });
-    if (!server) {
-      throw new NotFoundException(`Serwer o ID ${id} nie został znaleziony.`);
-    }
-    return this.serversRepository.save(server);
-  }
+    // --- POCZĄTEK POPRAWIONEJ METODY ---
+    async update(id: string, updateServerDto: UpdateServerDto): Promise<Server> {
+        // Sprawdzamy, czy w żądaniu aktualizacji podano nowy, niepusty klucz prywatny.
+        if (
+            updateServerDto.sshPrivateKey &&
+            updateServerDto.sshPrivateKey.trim() !== ''
+        ) {
+            // Jeśli tak, szyfrujemy go przed aktualizacją.
+            this.logger.log(`Otrzymano nowy klucz SSH dla serwera ${id}. Szyfrowanie...`);
+            updateServerDto.sshPrivateKey = this.encryptionService.encrypt(
+                updateServerDto.sshPrivateKey,
+            );
+        } else {
+            // Jeśli nie podano nowego klucza, usuwamy to pole z obiektu DTO.
+            // Dzięki temu `preload` nie nadpisze istniejącego klucza w bazie
+            // wartością pustą lub `undefined`. Zachowa starą wartość.
+            delete updateServerDto.sshPrivateKey;
+        }
 
-  async remove(id: string): Promise<void> {
-    const result = await this.serversRepository.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Serwer o ID ${id} nie został znaleziony.`);
+        const server = await this.serversRepository.preload({
+            id: id,
+            ...updateServerDto,
+        });
+
+        if (!server) {
+            throw new NotFoundException(`Serwer o ID ${id} nie został znaleziony.`);
+        }
+
+        this.logger.log(`Zapisywanie zmian dla serwera ${id}.`);
+        return this.serversRepository.save(server);
     }
-  }
+    // --- KONIEC POPRAWIONEJ METODY ---
+
+    async remove(id: string): Promise<void> {
+        const result = await this.serversRepository.delete(id);
+        if (result.affected === 0) {
+            throw new NotFoundException(`Serwer o ID ${id} nie został znaleziony.`);
+        }
+    }
 }
