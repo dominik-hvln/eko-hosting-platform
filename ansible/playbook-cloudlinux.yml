@@ -1,0 +1,137 @@
+- name: Pełny Provisioning Serwera Hostingowego
+  hosts: all
+  become: yes
+  gather_timeout: 60
+
+  vars:
+    # Klucze można przenieść do osobnego, szyfrowanego pliku vars
+    cloudlinux_activation_key: "CLP-DNNIgP8huDASI1R3qNsffgBA"
+    litespeed_serial_no: "t5wR-8Vxh-2dzM-ZStg"
+    litespeed_version: "6.3.2"
+
+    # Hasło zaszyfrowane za pomocą Ansible Vault
+    # Uruchom: ansible-vault encrypt_string 'TwojeSilneHaslo' --name 'litespeed_admin_pass'
+    litespeed_admin_pass: !vault |
+      $ANSIBLE_VAULT;1.1;AES256
+      64303738386432343336376130666633393833346332323461633030666639623963643937333665
+      3535363930653433613731653433616431653730393234610a383533383730363034626435313964
+      31623735383231323562346362616561303936663261303534653162373736646637616134643061
+      6130313563313136380a383966356363303330623337303161353464313861303435323635623138
+      6439
+
+  tasks:
+    # ===================================================
+    # ETAP 1: CLOUDLINUX
+    # Uruchomienie: ansible-playbook playbook.yml --tags cloudlinux
+    # ===================================================
+    - name: 1.1 - Upewnienie się, że wget jest zainstalowany
+      ansible.builtin.yum:
+        name: wget
+        state: present
+      tags: cloudlinux
+
+    - name: 1.2 - Pobranie skryptu cldeploy
+      ansible.builtin.get_url:
+        url: https://repo.cloudlinux.com/cloudlinux/sources/cln/cldeploy
+        dest: /root/cldeploy
+        mode: '0755'
+      tags: cloudlinux
+
+    - name: 1.3 - Sprawdzenie, czy system to już CloudLinux
+      ansible.builtin.stat:
+        path: /etc/cloudlinux-release
+      register: cloudlinux_release_file
+      tags: cloudlinux
+
+    - name: 1.4 - Uruchomienie konwersji do CloudLinux (jeśli konieczne)
+      command: ./cldeploy -k {{ cloudlinux_activation_key }}
+      args:
+        chdir: /root/
+        creates: /etc/redhat-release.lve
+      async: 1800
+      poll: 30
+      when: not cloudlinux_release_file.stat.exists
+      tags: cloudlinux
+
+    - name: 1.5 - Instalacja kluczowych narzędzi CloudLinux
+      ansible.builtin.yum:
+        name:
+          - lve-utils
+          - lve-stats
+          - cagefs
+        state: present
+      async: 1800
+      poll: 30
+      tags: cloudlinux
+
+    - name: 1.6 - Inicjalizacja CageFS (jeśli nie istnieje)
+      ansible.builtin.shell: "cagefsctl --init"
+      args:
+        creates: /var/cagefs/cagefs.mp
+      async: 1800
+      poll: 30
+      tags: cloudlinux
+
+    - name: 1.7 - Restart serwera w celu załadowania jądra CloudLinux
+      ansible.builtin.reboot:
+        msg: "Restartowanie serwera po instalacji CloudLinux. To może potrwać kilka minut..."
+        connect_timeout: 20
+        reboot_timeout: 600
+        pre_reboot_delay: 5
+        post_reboot_delay: 30
+        test_command: whoami
+      tags: cloudlinux
+
+    # ===================================================
+    # ETAP 2: LITESPEED
+    # Uruchomienie: ansible-playbook playbook.yml --tags litespeed
+    # ===================================================
+    - name: 2.1 - Upewnienie się, że wget i tar są zainstalowane
+      ansible.builtin.yum:
+        name: [wget, tar]
+        state: present
+      tags: litespeed
+
+    - name: 2.2 - Pobranie archiwum LiteSpeed
+      ansible.builtin.get_url:
+        url: "https://www.litespeedtech.com/packages/6.0/lsws-{{ litespeed_version }}-ent-x86_64-linux.tar.gz"
+        dest: "/root/lsws-{{ litespeed_version }}.tar.gz"
+      tags: litespeed
+
+    - name: 2.3 - Rozpakowanie archiwum LiteSpeed
+      ansible.builtin.unarchive:
+        src: "/root/lsws-{{ litespeed_version }}.tar.gz"
+        dest: /root/
+        remote_src: yes
+      tags: litespeed
+
+    - name: 2.4 - Stworzenie pliku z numerem seryjnym
+      ansible.builtin.copy:
+        content: "{{ litespeed_serial_no }}"
+        dest: "/root/lsws-{{ litespeed_version }}/serial.no"
+      tags: litespeed
+
+    - name: 2.5 - Przygotowanie pliku odpowiedzi dla instalatora (z hasłem z Vault)
+      ansible.builtin.template:
+        dest: "/root/lsws-{{ litespeed_version }}/install.answers"
+        src: "templates/litespeed_install.answers.j2"
+      tags: litespeed
+
+    - name: 2.6 - Uruchomienie skryptu instalacyjnego LiteSpeed
+      ansible.builtin.shell: "cd /root/lsws-{{ litespeed_version }} && ./install.sh < install.answers"
+      args:
+        executable: /bin/bash
+        creates: /usr/local/lsws/bin/lswsctrl
+      tags: litespeed
+
+    # ===================================================
+    # ETAP 3: FINALNA KONFIGURACJA
+    # Uruchomienie: ansible-playbook playbook.yml --tags config
+    # ===================================================
+    - name: 3.1 - Uruchomienie i włączenie autostartu dla LiteSpeed
+      ansible.builtin.systemd:
+        name: lsws
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      tags: config

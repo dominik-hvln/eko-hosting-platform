@@ -1,5 +1,3 @@
-// src/admin/servers/servers.controller.ts
-
 import {
   Controller,
   Get,
@@ -25,18 +23,29 @@ import { Role } from '../../common/enums/role.enum';
 export class ServersController {
   constructor(private readonly serversService: ServersService) {}
 
-  // --- ENDPOINT DO PROVISIONINGU ---
-  @Post(':id/provision')
-  provisionServer(@Param('id') id: string) {
-    return this.serversService.queueServerProvisioning(id);
+  // --- NOWE ENDPOINTY DLA ETAPÓW PROVISIONINGU ---
+  @Post(':id/provision/cloudlinux')
+  provisionCloudLinux(@Param('id') id: string) {
+    return this.serversService.queueProvisioningStage(id, 'cloudlinux');
   }
+
+  @Post(':id/provision/litespeed')
+  provisionLiteSpeed(@Param('id') id: string) {
+    return this.serversService.queueProvisioningStage(id, 'litespeed');
+  }
+
+  @Post(':id/provision/config')
+  provisionConfig(@Param('id') id: string) {
+    return this.serversService.queueProvisioningStage(id, 'config');
+  }
+  // --- KONIEC NOWYCH ENDPOINTÓW ---
+
 
   @Post(':id/test-connection')
   testConnection(@Param('id') id: string) {
     return this.serversService.testConnection(id);
   }
 
-  // --- STANDARDOWE ENDPOINTY CRUD ---
   @Post()
   create(@Body() createServerDto: CreateServerDto) {
     return this.serversService.create(createServerDto);

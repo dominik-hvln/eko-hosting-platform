@@ -7,6 +7,10 @@ services:
       - '4000:4000'
     volumes:
       - ./src:/usr/src/app/src
+      # --- POCZĄTEK KLUCZOWEJ POPRAWKI ---
+      # Ta linia udostępnia Twój lokalny klucz SSH do wnętrza kontenera
+      - ~/.ssh/id_rsa:/root/.ssh/id_rsa:ro
+      # --- KONIEC KLUCZOWEJ POPRAWKI ---
     env_file:
       - .env
     # Ta linia gwarantuje, że serwis bazy danych uruchomi się PRZED naszą aplikacją
